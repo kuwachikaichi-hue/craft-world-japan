@@ -1,0 +1,2334 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>クラフトワールドジャパン</title>
+<style>
+  :root{
+    --bg:#cfe8c2; --panel:#ffffff; --panel-border:#5a9a4a; --accent:#1f9e3e;
+    --accent2:#1467b0; --gold:#e0a800; --text:#13230f; --danger:#d81e1e;
+    --shadow: 0 4px 14px rgba(0,0,0,0.25);
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent; user-select:none;}
+  html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden;background:var(--bg);
+    font-family:"Hiragino Sans","Yu Gothic",sans-serif; color:var(--text);}
+  #gameCanvas{position:absolute;inset:0;width:100%;height:100%;display:block;}
+  #crosshair{
+    position:absolute; top:50%; left:50%; width:10px; height:10px; transform:translate(-50%,-50%);
+    border:2px solid rgba(40,40,40,0.8); border-radius:50%; pointer-events:none; z-index:50;
+    box-shadow:0 0 4px rgba(255,255,255,0.8);
+  }
+  #blockHint{
+    position:absolute; left:50%; top:calc(50% + 22px); transform:translate(-50%,0);
+    font-size:12px; background:rgba(255,255,255,0.85); padding:2px 8px; border-radius:6px;
+    pointer-events:none; z-index:50; display:none; box-shadow:var(--shadow);
+  }
+
+  /* ---------- TOP HUD ---------- */
+  #hudTop{position:absolute; top:8px; left:8px; right:8px; display:flex; justify-content:space-between; z-index:40; pointer-events:none;}
+  .statPanel{background:var(--panel); border:1px solid var(--panel-border); border-radius:10px; padding:6px 10px; box-shadow:var(--shadow); pointer-events:auto; font-size:12px; min-width:150px;}
+  .barRow{display:flex; align-items:center; gap:6px; margin:2px 0;}
+  .barLabel{width:38px; font-size:11px; opacity:0.75;}
+  .barOuter{flex:1; height:8px; background:#dde5d8; border-radius:5px; overflow:hidden;}
+  .barInner{height:100%; border-radius:5px; transition:width .2s;}
+  #hpBar{background:#e0554a;} #hungerBar{background:#e0a23a;}
+  #moneyLine{font-weight:bold; margin-top:4px; color:var(--gold);}
+  #wantedLine{color:var(--danger); font-weight:bold; display:none;}
+  #companyLine{font-size:11px; opacity:0.8; margin-top:2px;}
+
+  #miniMapWrap{background:var(--panel); border:1px solid var(--panel-border); border-radius:10px; padding:6px; box-shadow:var(--shadow); pointer-events:auto; text-align:center;}
+  #miniMap{width:110px; height:110px; border-radius:6px; background:#cfe3c8; position:relative; overflow:hidden; border:1px solid #b7c9ae;}
+  .mmDot{position:absolute; width:6px; height:6px; border-radius:50%; background:#2a6e9e; transform:translate(-50%,-50%);}
+  .mmSelf{background:#c0392b !important; width:7px; height:7px;}
+  #timeWeather{font-size:11px; margin-top:4px;}
+
+  /* ---------- BOTTOM HUD ---------- */
+  #invBar{
+    position:absolute; bottom:8px; left:50%; transform:translateX(-50%);
+    display:flex; gap:5px; z-index:40; background:var(--panel); padding:6px; border-radius:12px; box-shadow:var(--shadow);
+  }
+  .slot{
+    width:46px; height:46px; background:#f4f7f1; border:2px solid var(--panel-border); border-radius:8px;
+    display:flex; align-items:center; justify-content:center; font-size:20px; position:relative; cursor:pointer;
+  }
+  .slot.selected{border-color:var(--accent); box-shadow:0 0 0 2px var(--accent) inset;}
+  .slot .qty{position:absolute; bottom:1px; right:3px; font-size:10px; color:#333; background:rgba(255,255,255,0.7); border-radius:4px; padding:0 2px;}
+  .slot .slotNum{position:absolute; top:1px; left:3px; font-size:8px; opacity:0.5;}
+
+  #moveStick{position:absolute; left:14px; bottom:14px; width:120px; height:120px; z-index:45;}
+  #stickBase{width:100%; height:100%; border-radius:50%; background:rgba(63,143,79,0.15); border:2px solid rgba(63,143,79,0.4); position:relative;}
+  #stickKnob{width:48px; height:48px; border-radius:50%; background:rgba(63,143,79,0.7); position:absolute; left:36px; top:36px; box-shadow:0 2px 6px rgba(0,0,0,0.3);}
+
+  #leftSide{position:absolute; left:14px; bottom:150px; display:flex; flex-direction:column; gap:8px; z-index:45;}
+  #rightSide{position:absolute; right:14px; bottom:14px; display:grid; grid-template-columns:repeat(2,64px); gap:8px; z-index:45;}
+  .actBtn{
+    width:64px; height:64px; border-radius:50%; background:var(--panel); border:2px solid var(--panel-border);
+    box-shadow:var(--shadow); display:flex; align-items:center; justify-content:center; font-size:12px; text-align:center;
+    color:var(--text); font-weight:bold; cursor:pointer; line-height:1.1; transition:transform .08s;
+  }
+  .actBtn:active, .actBtn.pressed{transform:scale(0.88); background:#e3ede0;}
+  .actBtn.small{width:46px; height:46px; font-size:10px;}
+  #btnSwing{background:#fce7c8;} #btnHeave{background:#fcd6c0; width:50px; height:50px;}
+  #btnUse{background:#d8ecff;} #btnPick{background:#e4f7e0;} #btnTalk{background:#f0e0fa;}
+  #btnDash{background:#fff3c2;} #btnCrouch{background:#e8e8e8;} #btnJump{background:#cdeaff;}
+
+  #menuBtn{position:absolute; top:8px; right:130px; z-index:46; width:42px;height:42px;border-radius:50%;
+    background:var(--panel); border:1px solid var(--panel-border); box-shadow:var(--shadow); font-size:18px; cursor:pointer;}
+
+  #tabBar{position:absolute; right:8px; top:60%; transform:translateY(-50%); display:flex; flex-direction:column; gap:8px; z-index:44;}
+  .tabBtn{width:54px; padding:8px 0; border-radius:10px 0 0 10px; background:var(--panel); border:1px solid var(--panel-border);
+    box-shadow:var(--shadow); font-size:11px; text-align:center; cursor:pointer;}
+
+  #reportBtn{position:absolute; left:8px; top:46%; z-index:44; background:var(--panel); border:1px solid var(--danger);
+    color:var(--danger); border-radius:10px; padding:6px 8px; font-size:11px; box-shadow:var(--shadow); cursor:pointer;}
+
+  #centerMsg{position:absolute; left:50%; top:30%; transform:translateX(-50%); z-index:60; pointer-events:none; text-align:center;}
+  .toast{background:rgba(20,30,15,0.85); color:#fff; padding:6px 14px; border-radius:20px; margin-bottom:6px; font-size:13px; animation:fadeUp 2.4s forwards;}
+  @keyframes fadeUp{0%{opacity:0; transform:translateY(6px);} 12%{opacity:1; transform:translateY(0);} 80%{opacity:1;} 100%{opacity:0; transform:translateY(-10px);}}
+
+  #pickupPrompt, #receiveUI{
+    position:absolute; left:50%; bottom:120px; transform:translateX(-50%); z-index:55; display:none;
+  }
+  #pickupPrompt button, #receiveUI button{
+    padding:10px 18px; border-radius:24px; border:none; font-weight:bold; font-size:13px; box-shadow:var(--shadow); cursor:pointer;
+  }
+  #receiveUI{display:none; flex-direction:column; align-items:center; gap:6px;}
+  #receiveUI .row{display:flex; gap:10px;}
+  .btnYes{background:var(--accent); color:#fff;}
+  .btnNo{background:#ddd; color:#333;}
+  .bouncy{animation:bounce .5s ease;}
+  @keyframes bounce{0%{transform:scale(1);}40%{transform:scale(1.18);}70%{transform:scale(0.94);}100%{transform:scale(1);}}
+
+  /* ---------- PANELS (full screen overlays) ---------- */
+  .panelOverlay{
+    position:absolute; inset:0; background:rgba(20,30,15,0.35); z-index:200; display:none;
+    align-items:center; justify-content:center;
+  }
+  .panelBox{
+    width:min(640px,94vw); max-height:88vh; overflow-y:auto; background:var(--panel); border-radius:16px;
+    padding:16px; box-shadow:0 10px 30px rgba(0,0,0,0.3); border:1px solid var(--panel-border);
+  }
+  .panelBox h2{margin:0 0 10px; font-size:18px; border-bottom:2px solid var(--accent); padding-bottom:6px;}
+  .panelClose{float:right; cursor:pointer; font-size:20px; background:#eee; border-radius:50%; width:30px; height:30px; text-align:center; line-height:30px;}
+  .miniTabs{display:flex; gap:6px; margin-bottom:10px; flex-wrap:wrap;}
+  .miniTabs button{padding:6px 10px; border-radius:8px; border:1px solid var(--panel-border); background:#f4f7f1; font-size:12px; cursor:pointer;}
+  .miniTabs button.active{background:var(--accent); color:#fff;}
+  .itemRow{display:flex; justify-content:space-between; align-items:center; padding:6px 4px; border-bottom:1px solid #eee; font-size:12px;}
+  .itemRow .nm{font-weight:bold;}
+  .itemRow .ds{opacity:0.65; font-size:11px;}
+  .itemRow button{padding:4px 10px; border-radius:8px; border:none; background:var(--accent2); color:#fff; font-size:11px; cursor:pointer;}
+  input[type=text], input[type=number]{padding:6px 8px; border-radius:6px; border:1px solid var(--panel-border); width:100%; margin:4px 0; font-size:13px;}
+  .smallNote{font-size:11px; opacity:0.65;}
+  .flexGap{display:flex; gap:8px; flex-wrap:wrap;}
+  .tag{background:#dff0d4; border-radius:6px; padding:2px 6px; font-size:10px; font-weight:bold; color:#13230f;}
+  .companyFoundBtn{
+    display:block; width:100%; margin:10px 0; padding:14px; border-radius:14px; border:none;
+    background:linear-gradient(135deg,#1f9e3e,#0e6e26); color:#fff; font-size:16px; font-weight:bold;
+    box-shadow:0 6px 16px rgba(15,80,30,0.45); cursor:pointer; letter-spacing:1px;
+  }
+  .companyFoundBtn:disabled{ background:#999; box-shadow:none; cursor:not-allowed; opacity:0.7; }
+  .companyFoundBtn:not(:disabled):active{ transform:scale(0.97); }
+
+  #titleScreen, #lobbyScreen{
+    position:absolute; inset:0; z-index:500; background:linear-gradient(160deg,#eef4ea,#dcebd6);
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:14px; text-align:center; padding:20px;
+  }
+  #titleScreen h1{font-size:30px; color:var(--accent); margin:0;}
+  .worldBtnRow{display:flex; gap:10px;}
+  .worldBtn{width:64px;height:64px;border-radius:14px;background:var(--panel);border:2px solid var(--panel-border);
+    font-size:20px; font-weight:bold; cursor:pointer; box-shadow:var(--shadow);}
+  .worldBtn.sel{border-color:var(--accent); background:#eaf6e8;}
+  #titleScreen input{width:240px;}
+  .bigBtn{padding:12px 30px; border-radius:30px; border:none; background:var(--accent); color:#fff; font-size:15px; font-weight:bold; box-shadow:var(--shadow); cursor:pointer;}
+  #skinPickRow{display:flex; flex-wrap:wrap; gap:6px; max-width:320px; justify-content:center;}
+  .skinOpt{width:40px;height:40px;border-radius:10px;background:#fff;border:2px solid var(--panel-border);font-size:20px;display:flex;align-items:center;justify-content:center;cursor:pointer;}
+  .skinOpt.sel{border-color:var(--gold); background:#fff7e0;}
+
+  #signalingBox textarea{width:100%; height:70px; font-size:10px;}
+  #remotePlayers{font-size:12px; max-height:120px; overflow-y:auto;}
+  .remoteRow{display:flex; justify-content:space-between; padding:3px 0; border-bottom:1px dashed #ddd;}
+
+  ::-webkit-scrollbar{width:6px;} ::-webkit-scrollbar-thumb{background:#bbb; border-radius:3px;}
+</style>
+</head>
+<body>
+
+<!-- ============ TITLE SCREEN ============ -->
+<div id="titleScreen">
+  <h1>クラフトワールドジャパン</h1>
+  <div class="smallNote">現世を選んでください(1〜4)</div>
+  <div class="worldBtnRow" id="worldBtnRow">
+    <button class="worldBtn sel" data-w="1">現世1</button>
+    <button class="worldBtn" data-w="2">現世2</button>
+    <button class="worldBtn" data-w="3">現世3</button>
+    <button class="worldBtn" data-w="4">現世4</button>
+  </div>
+  <input type="text" id="nameInput" placeholder="名前を入力" maxlength="10" value="プレイヤー">
+  <div class="smallNote">スキン(絵文字)を選択 — 自分からは見えません(相手から見えます)</div>
+  <div id="skinPickRow"></div>
+  <input type="text" id="customSkinInput" placeholder="好きな絵文字を入力してスキンに" maxlength="4" style="width:200px;text-align:center;">
+  <div style="display:flex; gap:10px;">
+    <button class="bigBtn" id="startBtn">この現世で始める</button>
+    <button class="bigBtn" style="background:var(--accent2)" id="netBtn">通信設定(WebRTC)</button>
+  </div>
+  <div class="smallNote">音量・設定は右上メニューからいつでも変更できます</div>
+</div>
+
+<!-- ============ SIGNALING / NET PANEL ============ -->
+<div class="panelOverlay" id="signalingOverlay">
+  <div class="panelBox" id="signalingBox">
+    <span class="panelClose" onclick="closePanel('signalingOverlay')">×</span>
+    <h2>ローカル通信(WebRTC 手動シグナリング)</h2>
+    <div class="smallNote">同じ現世にいる相手と、Offer/Answerをコピペして接続します。サーバーは使わず、P2Pで位置・チャット・所持金状況などをリアルタイム同期します。</div>
+    <div class="flexGap" style="margin-top:8px;">
+      <button class="bigBtn" style="font-size:12px;padding:8px 14px;" onclick="net.createOffer()">① Offerを作る(部屋を作る側)</button>
+      <button class="bigBtn" style="font-size:12px;padding:8px 14px;background:var(--accent2)" onclick="net.createAnswerFromOffer()">② Offerから接続する(参加側)</button>
+    </div>
+    <div class="smallNote" style="margin-top:8px;">自分のSDP(相手に送る):</div>
+    <textarea id="localSDP" readonly></textarea>
+    <button onclick="navigator.clipboard.writeText(document.getElementById('localSDP').value)" style="margin:4px 0;">コピー</button>
+    <div class="smallNote">相手から受け取ったSDPを貼り付け:</div>
+    <textarea id="remoteSDP"></textarea>
+    <div class="flexGap">
+      <button class="bigBtn" style="font-size:12px;padding:8px 14px;" onclick="net.acceptRemote()">③ 貼り付けたSDPを適用</button>
+    </div>
+    <div id="netStatus" style="margin-top:8px; font-size:12px; font-weight:bold;">未接続</div>
+    <div id="remotePlayers"></div>
+  </div>
+</div>
+
+<!-- ============ MAIN GAME ============ -->
+<canvas id="gameCanvas"></canvas>
+<div id="crosshair"></div>
+<div id="blockHint"></div>
+
+<div id="hudTop">
+  <div class="statPanel" id="statPanel">
+    <div class="barRow"><div class="barLabel">HP</div><div class="barOuter"><div class="barInner" id="hpBar" style="width:100%"></div></div></div>
+    <div class="barRow"><div class="barLabel">満腹</div><div class="barOuter"><div class="barInner" id="hungerBar" style="width:100%"></div></div></div>
+    <div id="moneyLine">所持金: 500 金</div>
+    <div id="wantedLine">⚠ 指名手配中</div>
+    <div id="companyLine">所属: なし</div>
+  </div>
+  <div style="display:flex; flex-direction:column; gap:6px; align-items:flex-end;">
+    <div id="miniMapWrap">
+      <div id="miniMap"></div>
+      <div id="timeWeather">--:-- / 晴れ</div>
+    </div>
+  </div>
+</div>
+
+<div id="menuBtn">☰</div>
+
+<div id="tabBar">
+  <div class="tabBtn" onclick="openPanel('housePanel')">🏠家</div>
+  <div class="tabBtn" onclick="openPanel('companyPanel')">🏢会社</div>
+  <div class="tabBtn" onclick="openPanel('marketPanel')">🛒市場</div>
+  <div class="tabBtn" onclick="openPanel('estatePanel')">🏗不動産</div>
+  <div class="tabBtn" onclick="openPanel('policePanel')">🚓警察</div>
+</div>
+
+<div id="reportBtn" onclick="reportNearby()">📣通報</div>
+
+<div id="centerMsg"></div>
+
+<div id="pickupPrompt"><button class="btnYes" onclick="doPickup()">拾う / 対話</button></div>
+<div id="receiveUI">
+  <div style="background:#fff; padding:6px 12px; border-radius:10px; box-shadow:var(--shadow); font-size:12px;" id="receiveLabel">お金を受け取りますか?</div>
+  <div class="row">
+    <button class="btnYes" onclick="receiveAnswer(true)">はい</button>
+    <button class="btnNo" onclick="receiveAnswer(false)">キャンセル</button>
+  </div>
+</div>
+
+<div id="invBar"></div>
+
+<div id="moveStick"><div id="stickBase"><div id="stickKnob"></div></div></div>
+
+<div id="leftSide">
+  <div class="actBtn small" id="btnCrouch">しゃがみ</div>
+  <div class="actBtn small" id="btnDash">ダッシュ</div>
+  <div class="actBtn small" id="btnJump">ジャンプ</div>
+</div>
+
+<div id="rightSide">
+  <div class="actBtn" id="btnTalk">話す</div>
+  <div class="actBtn" id="btnPick">拾う</div>
+  <div class="actBtn" id="btnUse">使う</div>
+  <div class="actBtn" id="btnDrop" style="background:#ffe0e0;">🔘<br>捨てる</div>
+  <div class="actBtn" id="btnHeave">ふりかざす</div>
+  <div class="actBtn" id="btnSwing" style="grid-column:1/3; width:auto;">振る(設置/破壊)</div>
+</div>
+
+<!-- ============ PANEL: HOUSE ============ -->
+<div class="panelOverlay" id="housePanel">
+  <div class="panelBox">
+    <span class="panelClose" onclick="closePanel('housePanel')">×</span>
+    <h2>家</h2>
+    <div class="miniTabs">
+      <button class="active" data-h="craft" onclick="houseTab('craft')">クラフト</button>
+      <button data-h="storage" onclick="houseTab('storage')">収納箱</button>
+      <button data-h="board" onclick="houseTab('board')">掲示板</button>
+      <button data-h="design" onclick="houseTab('design')">服デザイン</button>
+      <button data-h="land" onclick="houseTab('land')">土地管理</button>
+    </div>
+    <div id="houseContent"></div>
+  </div>
+</div>
+
+<!-- ============ PANEL: COMPANY ============ -->
+<div class="panelOverlay" id="companyPanel">
+  <div class="panelBox">
+    <span class="panelClose" onclick="closePanel('companyPanel')">×</span>
+    <h2>会社</h2>
+    <div id="companyContent"></div>
+  </div>
+</div>
+
+<!-- ============ PANEL: MARKET ============ -->
+<div class="panelOverlay" id="marketPanel">
+  <div class="panelBox">
+    <span class="panelClose" onclick="closePanel('marketPanel')">×</span>
+    <h2>市場</h2>
+    <div class="miniTabs" id="marketCatTabs"></div>
+    <div class="smallNote">相場はプレイヤーの売買で需要供給に応じて変動します(±最大40%)。</div>
+    <div id="marketContent"></div>
+  </div>
+</div>
+
+<!-- ============ PANEL: ESTATE ============ -->
+<div class="panelOverlay" id="estatePanel">
+  <div class="panelBox">
+    <span class="panelClose" onclick="closePanel('estatePanel')">×</span>
+    <h2>不動産</h2>
+    <div id="estateContent"></div>
+  </div>
+</div>
+
+<!-- ============ PANEL: POLICE ============ -->
+<div class="panelOverlay" id="policePanel">
+  <div class="panelBox">
+    <span class="panelClose" onclick="closePanel('policePanel')">×</span>
+    <h2>bot警察署</h2>
+    <div id="policeContent"></div>
+  </div>
+</div>
+
+<!-- ============ PANEL: CHEST ============ -->
+<div class="panelOverlay" id="chestPanel">
+  <div class="panelBox">
+    <span class="panelClose" onclick="closePanel('chestPanel')">×</span>
+    <h2>📦 収納箱</h2>
+    <div class="smallNote">タップでアイテムを移動します(収納箱⇄インベントリ)。</div>
+    <div class="smallNote" style="margin-top:6px;">収納箱の中身:</div>
+    <div id="chestSlots" style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:10px;"></div>
+    <div class="smallNote">あなたの所持品:</div>
+    <div id="chestInvSlots" style="display:flex; flex-wrap:wrap; gap:6px;"></div>
+  </div>
+</div>
+
+<!-- ============ PANEL: MENU/SETTINGS ============ -->
+<div class="panelOverlay" id="menuPanel">
+  <div class="panelBox">
+    <span class="panelClose" onclick="closePanel('menuPanel')">×</span>
+    <h2>メニュー</h2>
+    <div class="itemRow"><span>音量</span><input type="range" id="volRange" min="0" max="100" value="70"></div>
+    <div class="itemRow"><span>視点感度</span><input type="range" id="sensRange" min="20" max="200" value="100"></div>
+    <div class="itemRow"><span>テレポート(噴水→隣丁)</span>
+      <span class="flexGap">
+        <button onclick="teleportToWorld('north')">北</button>
+        <button onclick="teleportToWorld('south')">南</button>
+        <button onclick="teleportToWorld('east')">東</button>
+        <button onclick="teleportToWorld('west')">西</button>
+      </span>
+    </div>
+    <div class="itemRow"><span>操作説明</span><span class="smallNote">左パッドで移動/右ボタン群で行動/画面ドラッグで視点</span></div>
+    <div class="itemRow"><span>通信</span><button onclick="closePanel('menuPanel');openPanel('signalingOverlay')">WebRTC設定を開く</button></div>
+    <div class="itemRow"><span>現在の現世</span><span id="worldLabel">現世1</span></div>
+  </div>
+</div>
+
+<!-- ============ THREE.JS (CDN) ============ -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+/* ===================================================================================
+   クラフトワールドジャパン — コアエンジン
+   1人称3D / ブロックグリッド / インベントリ / 経済 / 警察 / WebRTC手動シグナリング / 音
+   =================================================================================== */
+
+/* ---------------------------------------------------------------------------------
+   0. 全アイテムデータ(20ジャンル × 各10種、名前/描写/効果/売値)
+--------------------------------------------------------------------------------- */
+const ITEM_DB = {
+  "木材系": [
+    ["丸棒","削りたての木の香りが残る、手に馴染む細い棒。","軽量、汎用",20],
+    ["板材","木目がまっすぐ通った、扱いやすい平たい木材。","建築、加工基礎",25],
+    ["木箱","釘跡は少し荒いが、素朴で頼れる収納箱。","収納+10",35],
+    ["木槌","叩くたびに乾いた音が響く、素直な木の槌。","叩く、修理",30],
+    ["柄棒","表面がなめらかに磨かれた、握りやすい棒。","つかむ、振る",18],
+    ["木車輪","軽く回るが、どこか温もりのある木製の輪。","移動補助",40],
+    ["木椅子","座るとわずかに軋む、安心感のある木の椅子。","休憩、回復",45],
+    ["木盾","木目の上に補強が走る、素朴で堅い盾。","防御上昇",50],
+    ["梁材","太く長く、家の骨組みを支える頼もしさがある。","建築強化",55],
+    ["高級木札","漆の艶が静かに光る、刻印入りの上質な札。","装飾、贈答",80]
+  ],
+  "石材系": [
+    ["石ころ包み","布に包まれた、重くて投げやすい石の束。","投擲、重み",18],
+    ["石板","表面が平らで、文字や掲示に向く石の板。","建材、掲示",24],
+    ["石杭","先端が尖り、地面に刺さりやすい石の杭。","設置、牽制",28],
+    ["石槌","重みがそのまま力になる、素朴で無骨な槌。","叩く、耐久高",32],
+    ["砥石","指でなぞるとざらりと返る、刃を整える石。","修理補助",38],
+    ["石皿","冷たく硬い、食事にも飾りにも使える皿。","食事用、装飾",30],
+    ["石椅子","ずっしりとして動かない、据え置きの椅子。","休憩、固定",48],
+    ["石壁材","厚みがあり、外からの圧をしっかり受け止める。","建築、防壁",60],
+    ["石像片","欠けてもなお存在感のある、彫刻の一部。","装飾、高価",75],
+    ["高級石印","緻密な彫りが入った、契約向きの格式ある印。","権威、契約",95]
+  ],
+  "金属系": [
+    ["鉄片","冷たい光を返す、精錬直後の基礎金属。","基礎金属",30],
+    ["鉄釘","細く鋭く、打ち込むたびに軽く鳴る釘。","建築補助",22],
+    ["鉄板","鈍い輝きのある、重厚な金属板。","耐久、建材",45],
+    ["鉄包丁","刃先が冷たく光る、切れ味のいい金属刃。","切る、調理",50],
+    ["鉄鎖","金属音がはっきり響く、重い連結鎖。","拘束、防犯",55],
+    ["鉄車軸","摩擦を抑えるため、丁寧に磨かれた回転軸。","車両部品",60],
+    ["鉄箱金具","箱の角をきゅっと締める、実用的な留め具。","箱強化",42],
+    ["鉄盾","金属の重さがそのまま守りになる堅牢な盾。","防御高",70],
+    ["機械芯材","端子や配線の受け皿になる、機械の中心部。","電化基礎",85],
+    ["高級金属章","磨き上げられた表面に意匠が沈む、格式ある章。","権威、希少",120]
+  ],
+  "布系": [
+    ["糸束","指先でほどけそうな、細く撚られた繊維の束。","裁縫基礎",18],
+    ["布切れ","余った布ではあるが、修繕には十分使える。","修繕、包み",20],
+    ["包帯","清潔でやわらかく、傷に巻くと安心感がある。","回復補助",28],
+    ["肩掛け袋","しっかりした紐付きで、歩きながら使いやすい。","収納+5",30],
+    ["帽子","ふっと影を落とし、頭を守る軽やかな布製品。","防寒、見た目",24],
+    ["布旗","風を受けるたび、所属を静かに主張する布。","表示、所属",35],
+    ["丈夫な紐","しなやかだが、引っ張ると頼りがいがある。","結束、固定",26],
+    ["布靴ひも","ほどけにくいよう、細く丁寧に編まれたひも。","靴補助",18],
+    ["高級反物","光を受けると艶がにじむ、上質な布地。","高級服素材",90],
+    ["礼服地","密度が高く、手触りだけで格が伝わる布。","高級衣類",110]
+  ],
+  "食材系": [
+    ["生野菜","収穫の匂いがそのまま残る、新鮮な葉物。","空腹回復小",12],
+    ["焼き芋","甘い湯気がふわりと立つ、ほくほくの芋。","空腹回復中",18],
+    ["乾パン","乾いた音がするほど保存性の高い食べ物。","保存食",22],
+    ["漬物","塩気と香りがきゅっと凝縮した、長持ちする一品。","保存、満腹小",20],
+    ["甘味団子","もちっとした弾力と、やさしい甘さが残る。","気分上昇",25],
+    ["肉串","焼き目が香ばしく、見ただけで腹が鳴る。","空腹回復中",30],
+    ["魚切り身","きれいにさばかれ、調理しやすい切り身。","回復、調理用",28],
+    ["スープ素材","野菜と水の香りが混ざる、温かい下ごしらえ。","回復補助",26],
+    ["保存食","塩と乾燥で守られた、旅向きの頼れる食料。","長期保存",35],
+    ["高級弁当","彩りまで整えられた、見ても食べても満足な弁当。","大回復、満腹",70]
+  ],
+  "飲料系": [
+    ["水筒水","ひんやりと落ち着く、持ち歩きやすい水。","のど回復",10],
+    ["薄茶","すっきりした香りが立つ、軽いお茶。","眠気軽減",15],
+    ["果汁","果物の甘さがぎゅっと詰まった、明るい飲み物。","回復小",20],
+    ["炭酸水","口の中でぱちぱち弾ける、気分転換の水。","気分上昇",18],
+    ["回復茶","薬草の香りが静かに広がる、落ち着いた茶。","回復中",28],
+    ["栄養乳","まろやかで腹持ちがいい、栄養重視の乳飲料。","空腹補助",32],
+    ["眠気飛びコーヒー","苦味がしっかり立つ、意識を引き締める飲み物。","集中上昇",30],
+    ["発泡酒","軽い苦味と泡が残る、気分をゆるめる一杯。","気分高揚",25],
+    ["薬湯","草の香りが熱とともに立ちのぼる、回復用の湯。","回復大",35],
+    ["高級果実酒","深い香りと甘さが混ざる、贅沢な嗜好品。","高級嗜好品",80]
+  ],
+  "調理器具系": [
+    ["まな板","何度も使われた跡がある、実直な調理台の一部。","調理基礎",20],
+    ["包丁","先端が鋭く、食材をすっと切り分ける刃。","さばく、切る",45],
+    ["鍋","黒ずんだ底が頼もしい、加熱向きの鍋。","加熱調理",50],
+    ["フライパン","焼き目がきれいにつく、扱いやすい平鍋。","焼く",48],
+    ["串焼き台","火の前でじっくり焼くための、素朴な台。","焼き料理",60],
+    ["蒸し器","湯気をため込み、やわらかく仕上げる器具。","蒸す",65],
+    ["急須","湯を静かに落とす、小ぶりで上品な器。","飲料調理",42],
+    ["トング","先端がきれいに揃い、つかみやすい金具。","つかむ",38],
+    ["料理台","下ごしらえから盛り付けまで支える作業台。","調理効率上昇",70],
+    ["高級調理台","触るとひんやりし、作業の気分まで整う台。","高速調理",120]
+  ],
+  "衣類系": [
+    ["粗布服","ざらりとした手触りの、最低限の服。","基本防寒",22],
+    ["作業着","汚れに強く、働く人の匂いがする服。","労働効率小上昇",35],
+    ["外套","風を受け止める、少し大きめの上着。","防寒、外出向き",45],
+    ["雨合羽","水滴を弾いて光る、防水寄りの衣服。","雨耐性",50],
+    ["礼服","生地の揃い方からして整っている、きちんとした服。","交渉、見た目",90],
+    ["防寒服","触ると厚く、冬の空気を押し返すような服。","寒さ軽減",70],
+    ["旅人服","軽くて動きやすい、歩くための服。","移動向き",55],
+    ["社長服","縫い目まで上品で、着るだけで立場が伝わる。","権威、印象上昇",120],
+    ["高級ドレス","布の流れが美しく、視線を集める華やかな服。","高級感、売上補正",160],
+    ["機能服","軽さと耐久を両立した、実用最優先の服。","全体補助",140]
+  ],
+  "靴系": [
+    ["草鞋","足裏に自然に馴染む、素朴で軽い履物。","軽い移動",18],
+    ["作業靴","地面をしっかり踏める、丈夫な作業用。","労働向き",30],
+    ["革靴","きっちりと形が整い、交渉の場に似合う。","交渉、見た目",45],
+    ["長靴","泥や水を気にせず歩ける、頼れる靴。","水に強い",50],
+    ["軽量靴","見た目よりずっと軽く、足運びが速い。","速さ上昇",42],
+    ["防寒靴","内側にぬくもりが残る、冬向きの靴。","寒さ軽減",55],
+    ["運動靴","弾みがあり、走ることに向いた靴。","走行向き",48],
+    ["高級靴","つま先まできれいに揃った、上等な一足。","高級感",95],
+    ["滑り止め靴","底の溝が深く、足元を安定させる。","転倒軽減",60],
+    ["乗馬靴","すっと伸びる形が美しい、移動者向けの靴。","車両・乗り物向き",70]
+  ],
+  "家具系": [
+    ["簡易椅子","少し軋むが、座ればひとまず落ち着ける。","休憩",20],
+    ["木机","木目が素直に見える、作業しやすい机。","作業効率小上昇",40],
+    ["棚","物を並べるだけで整って見える、実用的な棚。","収納増加",45],
+    ["寝台","横になると少し安心する、休むための台。","回復効率",55],
+    ["食卓","食事の時間をきちんと見せる、家の中心。","食事用",50],
+    ["箱椅子","座れて収納もできる、気の利いた箱。","収納兼用",38],
+    ["高級椅子","布の張りと木の艶が目を引く、上質な椅子。","見た目、快適",90],
+    ["書斎机","経営や学習の空気を作る、落ち着いた机。","学習、経営補助",100],
+    ["大きな棚","壁際をしっかり埋める、頼もしい収納棚。","大収納",110],
+    ["応接ソファ","ふわりと沈む、交渉の場を整えるソファ。","交渉、快適",150]
+  ],
+  "建材系": [
+    ["土ブロック","まだ素朴なままの、積みやすい土の塊。","基礎建材",10],
+    ["木壁","木の香りが残る、あたたかい壁材。","住宅壁",35],
+    ["石壁","冷たく重く、外敵を寄せつけにくい壁。","防御建材",55],
+    ["屋根材","雨粒を受け止める、軽やかな屋根の素材。","雨防止",40],
+    ["柱材","上からの圧をまっすぐ受け止める、重要な部材。","支持力増加",45],
+    ["床材","足音が落ち着いて響く、歩きやすい床。","歩きやすい",38],
+    ["窓枠","光をうまく切り取り、風景を額縁にする枠。","視認性",30],
+    ["ドア枠","出入りのたびに空気が変わる、境界の枠。","出入口",42],
+    ["強化壁材","石壁に金属の気配を足した、堅牢な防壁。","耐久高",90],
+    ["高級外装材","表面の仕上げだけで格が伝わる、上等な外壁。","高級建築",140],
+    ["家土地マット","真っ白に輝く、住宅区画専用の土地マット。設置すると家の目印になる。","住宅地表示(白)",20],
+    ["会社土地マット","重厚な灰色の、会社・商業区画専用の土地マット。50個集めると会社が設立できる。","商業地表示(灰)",30],
+    ["農地マット","濃い茶色の、農地専用の土地マット。敷くと畑として使える。","農地表示(茶)",15],
+    ["高級農地マット","金色の筋が入った、種を植えるために必要な特別な農地マット。","種植え許可",300]
+  ],
+  "農業系": [
+    ["種袋","小さな粒がカサカサ鳴る、播種用の袋。","播種",15],
+    ["水桶","たっぷり水を運べる、農家の必需品。","灌漑",25],
+    ["肥料","土に力を戻す、少し匂うが頼れる資材。","成長促進",30],
+    ["クワ","土を返すたびにリズムが生まれる、耕作道具。","耕作",40],
+    ["スコップ","土をすくい、形を整えるための基本工具。","掘る",42],
+    ["収穫籠","取れた実を優しく受け止める、編み籠。","回収効率",35],
+    ["支柱","作物をまっすぐ育てる、細いけれど大切な棒。","作物支え",28],
+    ["水路材","水の流れを整える、畑の血管のような部材。","水回し",50],
+    ["温室材","光を通して熱をためる、育成に向いた素材。","生育補助",120],
+    ["高級畑札","立てるだけで畑が格上げされる、特別な札。","畑の価値上昇",80]
+  ],
+  "工具系": [
+    ["小槌","ちいさな打撃音が気持ちいい、手軽な槌。","打つ",20],
+    ["ノコギリ","刃が細かく並び、木を少しずつ切っていく。","切断",45],
+    ["ドライバー","先端がぴたりと合う、組み立て向きの道具。","組立",35],
+    ["ペンチ","握るとしっかり力が伝わる、つかみ道具。","つかむ",40],
+    ["レンチ","ひねる動作に特化した、締めるための道具。","締める",38],
+    ["釘抜き","こじるときの手応えが気持ちいい、修理向き道具。","修理",30],
+    ["測定器","目盛りが整っていて、正確さを与えてくれる。","計測",60],
+    ["研磨具","表面を少しずつ整え、滑らかにする道具。","研ぐ",42],
+    ["修理箱","必要な小物がまとまった、頼れる一式。","修理一式",75],
+    ["高級工具箱","金具の輝きが違う、性能も見た目も上位。","高性能",130]
+  ],
+  "電化系": [
+    ["電池","小さいのにしぶとく働く、電力の元。","電力供給",25],
+    ["ランプ","暗がりに小さな輪を作る、安定した光源。","照明",35],
+    ["配線","見た目は地味だが、機械同士をつなぐ要。","接続",30],
+    ["スイッチ","カチッと軽い音が気持ちいい、切替器。","ON/OFF",28],
+    ["扇風機","羽根が涼しい風をつくる、生活感のある電化品。","涼しさ",65],
+    ["充電器","足りない電気を静かに戻す、補給装置。","充電",60],
+    ["ラジオ","小さな音が空間を埋める、情報の受信機。","情報取得",70],
+    ["掃除機","空気を吸い込む音が強く、清掃の存在感がある。","清掃",85],
+    ["モニタ","画面がぱっと開き、世界を映し出す。","表示",90],
+    ["高級端末","触れるだけで反応が違う、多機能な上位機器。","多機能",160]
+  ],
+  "車両系": [
+    ["車輪","まっすぐ転がる、移動の原点みたいな輪。","移動基礎",35],
+    ["軸","回転を逃さない、まっすぐな芯。","回転補助",30],
+    ["ハンドル","握る角度で進み方が変わる、操舵の要。","操舵",40],
+    ["座席","長く座っても疲れにくい、乗るための場所。","乗車快適",45],
+    ["荷台","荷物を積むと頼もしさが増す、運搬の土台。","物運び",60],
+    ["エンジン","低くうなるような力を生む、推進の心臓。","推進力",120],
+    ["タイヤ","路面をしっかりつかむ、走りの要。","路面対応",80],
+    ["窓","外の景色が見え、運転の不安を減らす。","視界",50],
+    ["小型車","軽快に走り、街の中を素早く抜ける。","移動高速化",250],
+    ["高級車体","走るだけで目を引く、上質な外装と構造。","高速・高級",500]
+  ],
+  "医療系": [
+    ["湿布","ひんやりしていて、貼ると痛みが和らぐ。","痛み軽減",20],
+    ["包帯","清潔でやわらかく、傷に巻くと安心する。","回復補助",25],
+    ["消毒液","かすかな刺激のある、衛生を守る液体。","感染防止",30],
+    ["痛み止め","つらさを少し遠ざける、頼れる小瓶。","即時回復小",40],
+    ["注射器","細く鋭い、薬を正確に届ける道具。","投与",55],
+    ["救急箱","必要なものがひとまとめになった、安心の箱。","回復一式",80],
+    ["マスク","口元を静かに覆う、衛生意識のある布。","衛生",18],
+    ["体温計","健康状態を数字で見せる、細い計測器。","健康確認",45],
+    ["治療具","触れると手当の気配がある、本格的な器具。","回復大",100],
+    ["高級診療箱","ふたを開けるだけで整って見える、上位医療箱。","高回復",170]
+  ],
+  "会社系": [
+    ["名刺","小さいのに存在感がある、自己紹介の札。","交渉補助",10],
+    ["印章","押すと責任が生まれる、契約の印。","契約用",25],
+    ["書類束","きちんと揃えられた、業務のまとまり。","業務資料",20],
+    ["掲示板紙","情報を書いて貼るだけで、空間が動き出す。","告知",15],
+    ["会計帳","数字が並び、会社の空気を引き締める。","会計管理",35],
+    ["社員証","首から下げるだけで所属が伝わる。","入退社管理",30],
+    ["契約書","行間まで重みがある、会社の約束事。","法的効力",40],
+    ["ロッカー鍵","小さいが、個人の持ち場を守る鍵。","収納管理",28],
+    ["社長机","座るだけで視界が広くなる、経営の机。","経営補助",120],
+    ["高級社章","金属と宝石の気配が混ざる、誇りの象徴。","権威",180]
+  ],
+  "法務・警察系": [
+    ["通報札","見るだけで何かあったと伝わる、簡潔な札。","通報可視化",12],
+    ["手錠","金属の冷たさがはっきり伝わる拘束具。","拘束",50],
+    ["証拠袋","中身を守るため、封がしっかり閉じる袋。","証拠保存",30],
+    ["張り紙","壁に貼ると空気が変わる、目立つ告知紙。","指名手配表示",18],
+    ["捜査メモ","手早く要点が残せる、記録用の紙束。","記録",20],
+    ["拘束帯","布と金具が組み合わさった、制圧向きの帯。","制圧",45],
+    ["巡回札","警備の動きを示す、視認性の高い札。","警備認識",35],
+    ["警棒","片手で扱いやすい、護身向きの棒。","護身",60],
+    ["掲示板札","告知をまとめて見せる、掲示向きの札。","告知",15],
+    ["高級令状","厚みがあり、持つだけで重みを感じる紙。","強制力",130]
+  ],
+  "生活雑貨系": [
+    ["皿","つるりとした面が、食事をきれいに見せる。","食事用",15],
+    ["箸","軽くて細く、手になじむ食卓の道具。","食事用",12],
+    ["コップ","透明感があり、飲み物が映える器。","飲用",18],
+    ["タオル","吸う力があり、触れると安心する布。","清潔",20],
+    ["櫛","髪を整えるたび、身だしなみが締まる。","身だしなみ",14],
+    ["鏡","自分の顔を静かに返す、日常の相棒。","見た目確認",35],
+    ["傘","開くと空気の形が変わる、雨の日の味方。","雨対策",40],
+    ["袋","何でもひとまず受け止める、素朴な運搬具。","持ち運び",18],
+    ["掃除道具","端を使うたび、空間が少しずつ整う。","清掃",30],
+    ["高級日用品箱","まとめて並べるだけで生活が上品に見える。","収納、装飾",100]
+  ],
+  "装飾・高級品系": [
+    ["花飾り","近づくとふわっと香る、やわらかな飾り。","装飾",20],
+    ["金箔紙","角度で光が流れる、派手すぎない贅沢。","高級表示",35],
+    ["香袋","袖口に残るくらい、やさしい香りの袋。","香り、印象",28],
+    ["宝石片","小さいのに光だけは強い、価値の塊。","高級素材",80],
+    ["装飾灯","点けると部屋の雰囲気が一段上がる。","雰囲気上昇",70],
+    ["高級ボタン","服の印象を静かに変える、小さな主役。","服飾用",32],
+    ["彫刻札","表面の線が美しい、記念向きの札。","記念品",45],
+    ["金縁鏡","枠の豪華さで、映る景色まで上品に見える。","高級感",120],
+    ["宝箱","開ける前から特別感がある、豪華な収納。","収納、高級",150],
+    ["王冠","持つだけで場の空気が変わる、象徴的な品。","権威、象徴",300]
+  ]
+};
+// フラット化 + ID付与 + 現在相場(初期値=売値)
+const ALL_ITEMS = [];
+let _iid = 1;
+for(const cat in ITEM_DB){
+  ITEM_DB[cat].forEach(([name,desc,effect,price])=>{
+    ALL_ITEMS.push({id:_iid++, cat, name, desc, effect, basePrice:price, price, supply:50, demand:50});
+  });
+}
+function findItem(name){ return ALL_ITEMS.find(i=>i.name===name); }
+function findItemById(id){ return ALL_ITEMS.find(i=>i.id===id); }
+
+/* ---------------------------------------------------------------------------------
+   1. サウンド(WebAudio、外部ファイル不要 — GitHub Pagesでもそのまま鳴る)
+--------------------------------------------------------------------------------- */
+const SND = (()=>{
+  let ctx=null, master=null;
+  function ensure(){
+    if(!ctx){
+      ctx = new (window.AudioContext||window.webkitAudioContext)();
+      master = ctx.createGain(); master.gain.value=0.7; master.connect(ctx.destination);
+    }
+    if(ctx.state==='suspended') ctx.resume();
+  }
+  function setVolume(v){ if(master) master.gain.value=v; }
+  function tone(freq, dur, type='sine', vol=0.3, slideTo=null){
+    ensure();
+    const o=ctx.createOscillator(), g=ctx.createGain();
+    o.type=type; o.frequency.setValueAtTime(freq, ctx.currentTime);
+    if(slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, ctx.currentTime+dur);
+    g.gain.setValueAtTime(vol, ctx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime+dur);
+    o.connect(g); g.connect(master);
+    o.start(); o.stop(ctx.currentTime+dur);
+  }
+  function noise(dur, vol=0.2){
+    ensure();
+    const bufferSize = ctx.sampleRate*dur;
+    const buffer = ctx.createBuffer(1,bufferSize,ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for(let i=0;i<bufferSize;i++) data[i]=(Math.random()*2-1)*(1-i/bufferSize);
+    const src = ctx.createBufferSource(); src.buffer=buffer;
+    const g = ctx.createGain(); g.gain.value=vol;
+    src.connect(g); g.connect(master); src.start();
+  }
+  return {
+    init:ensure, setVolume,
+    step:()=>tone(180+Math.random()*40,0.07,'square',0.06),
+    jump:()=>tone(440,0.12,'sine',0.2,660),
+    land:()=>noise(0.08,0.15),
+    place:()=>tone(300,0.09,'triangle',0.25,420),
+    breakBlock:()=>{ noise(0.12,0.25); tone(150,0.1,'sawtooth',0.15,90); },
+    coin:()=>{ tone(880,0.08,'square',0.2,1320); setTimeout(()=>tone(1320,0.1,'square',0.18),60); },
+    success:()=>{ tone(523,0.1,'sine',0.25,784); setTimeout(()=>tone(784,0.15,'sine',0.2,1046),90); },
+    fail:()=>tone(220,0.25,'sawtooth',0.2,110),
+    notify:()=>tone(700,0.08,'sine',0.2,900),
+    alarm:()=>{ tone(900,0.15,'square',0.25,500); setTimeout(()=>tone(900,0.15,'square',0.25,500),200); },
+    water:()=>noise(0.3,0.08),
+    craft:()=>{ tone(400,0.06,'square',0.15); setTimeout(()=>tone(500,0.06,'square',0.15),80); setTimeout(()=>tone(650,0.08,'square',0.18),160); },
+    talk:()=>tone(520,0.05,'sine',0.15,560),
+    door:()=>tone(260,0.18,'triangle',0.2,200)
+  };
+})();
+
+/* ---------------------------------------------------------------------------------
+   2. プレイヤー状態
+--------------------------------------------------------------------------------- */
+const SKINS_DEFAULT = ["🙂","🧑","👩","🧔","👨‍🌾","🧑‍🌾","🧑‍💼","👮","🥷","🧙","🧑‍🚀","🤠","😺","🐻","🐸","🦊"];
+
+const state = {
+  name:"プレイヤー", skin:"🙂", world:1,
+  hp:100, hunger:100, money:500,
+  pos:{x:350,z:350}, yaw:0, pitch:0,
+  inventory: new Array(10).fill(null), // {itemId, qty}
+  selectedSlot:0,
+  status:"ホームレス", // ホームレス/仮住まい/土地所有者/家所有者/会社員/農家/会社社長/指名手配犯/懲役中
+  company:null, // {name, role}
+  ownedLand: [],
+  ownedHouse:false,
+  crimeValue:0,
+  wanted:false,
+  jailedUntil:0,
+  reportCount:0,
+  trust:0,
+  workSeconds:0,
+  workTickAccum:0,
+};
+
+let companies = []; // {id, name, owner, employees:[{name,wage}], treasury}
+let landPlots = []; // {id, type, x,z, owner, price}
+function genLandPlots(){
+  landPlots = [];
+  let id=1;
+  const types = [
+    {type:"住宅区画", price:300, count:14, area:[[200,500,380,560]]},
+    {type:"商業区画", price:800, count:6, area:[[420,470,320,370]]},
+    {type:"農地", price:200, count:10, area:[[80,220,500,650]]},
+    {type:"会社区画", price:1200, count:10, area:[[300,550,430,620]]},
+  ];
+  types.forEach(t=>{
+    for(let i=0;i<t.count;i++){
+      const a = t.area[0];
+      const x = a[0] + Math.random()*(a[1]-a[0]);
+      const z = a[2] + Math.random()*(a[3]-a[2]);
+      landPlots.push({id:id++, type:t.type, x:Math.round(x), z:Math.round(z), owner:null, price:t.price});
+    }
+  });
+}
+genLandPlots();
+
+function addItem(itemId, qty=1){
+  // 既存スタックに追加
+  for(const slot of state.inventory){
+    if(slot && slot.itemId===itemId && slot.qty<60){
+      const room = 60-slot.qty;
+      const add = Math.min(room, qty);
+      slot.qty += add; qty -= add;
+      if(qty<=0){ renderInventory(); return true; }
+    }
+  }
+  for(let i=0;i<state.inventory.length;i++){
+    if(!state.inventory[i]){
+      const put = Math.min(60, qty);
+      state.inventory[i] = {itemId, qty:put};
+      qty -= put;
+      if(qty<=0){ renderInventory(); return true; }
+    }
+  }
+  renderInventory();
+  return qty<=0;
+}
+function removeItemAt(slotIdx, qty=1){
+  const s = state.inventory[slotIdx];
+  if(!s) return false;
+  s.qty -= qty;
+  if(s.qty<=0) state.inventory[slotIdx]=null;
+  renderInventory();
+  return true;
+}
+function countItem(itemId){
+  return state.inventory.reduce((sum,s)=> s && s.itemId===itemId ? sum+s.qty : sum, 0);
+}
+
+/* ---------------------------------------------------------------------------------
+   3. UI: トースト / 通知
+--------------------------------------------------------------------------------- */
+function toast(msg){
+  const c = document.getElementById('centerMsg');
+  const d = document.createElement('div');
+  d.className='toast'; d.textContent=msg;
+  c.appendChild(d);
+  setTimeout(()=>d.remove(), 2500);
+}
+
+/* ---------------------------------------------------------------------------------
+   4. インベントリUI(ドラッグ&ドロップ対応)
+--------------------------------------------------------------------------------- */
+function renderInventory(){
+  const bar = document.getElementById('invBar');
+  bar.innerHTML='';
+  state.inventory.forEach((slot,i)=>{
+    const el = document.createElement('div');
+    el.className='slot'+(i===state.selectedSlot?' selected':'');
+    el.draggable = !!slot;
+    el.dataset.idx = i;
+    if(slot){
+      const it = findItemById(slot.itemId);
+      el.innerHTML = `<span>${slotIcon(it.cat)}</span><span class="qty">${slot.qty}</span><span class="slotNum">${i+1}</span>`;
+      el.title = `${it.name}\n${it.desc}\n効果:${it.effect}`;
+    } else {
+      el.innerHTML = `<span class="slotNum">${i+1}</span>`;
+    }
+    el.addEventListener('click', ()=>{ state.selectedSlot=i; renderInventory(); });
+    el.addEventListener('dragstart', e=>{ e.dataTransfer.setData('text/plain', i); });
+    el.addEventListener('dragover', e=>e.preventDefault());
+    el.addEventListener('drop', e=>{
+      e.preventDefault();
+      const from = parseInt(e.dataTransfer.getData('text/plain'));
+      const to = i;
+      if(from===to) return;
+      const tmp = state.inventory[to];
+      state.inventory[to] = state.inventory[from];
+      state.inventory[from] = tmp;
+      renderInventory();
+    });
+    bar.appendChild(el);
+  });
+}
+function slotIcon(cat){
+  const map = {"木材系":"🪵","石材系":"🪨","金属系":"⚙️","布系":"🧵","食材系":"🍠","飲料系":"🥤",
+    "調理器具系":"🍳","衣類系":"👕","靴系":"👞","家具系":"🪑","建材系":"🧱","農業系":"🌱","工具系":"🔧",
+    "電化系":"🔌","車両系":"🚗","医療系":"💊","会社系":"📇","法務・警察系":"🚓","生活雑貨系":"🧺","装飾・高級品系":"💎"};
+  return map[cat]||"📦";
+}
+renderInventory();
+
+/* ---------------------------------------------------------------------------------
+   5. ステータス更新(HP/満腹/所持金/犯罪)
+--------------------------------------------------------------------------------- */
+function refreshHud(){
+  document.getElementById('hpBar').style.width = Math.max(0,state.hp)+'%';
+  document.getElementById('hungerBar').style.width = Math.max(0,state.hunger)+'%';
+  document.getElementById('moneyLine').textContent = `所持金: ${Math.floor(state.money)} 金`;
+  document.getElementById('wantedLine').style.display = state.wanted? 'block':'none';
+  document.getElementById('companyLine').textContent = `所属: ${state.company? state.company.name+'('+state.company.role+')' : 'なし'} / 状態:${state.status}`;
+  document.getElementById('worldLabel').textContent = '現世'+state.world;
+}
+function gainMoney(amount, reason){
+  state.money += amount;
+  if(amount>0) SND.coin();
+  refreshHud();
+  if(reason) toast((amount>=0?'+':'')+Math.floor(amount)+'金 ('+reason+')');
+}
+function spendMoney(amount, reason){
+  if(state.money < amount){ toast('所持金が足りません'); SND.fail(); return false; }
+  state.money -= amount;
+  refreshHud();
+  if(reason) toast('-'+Math.floor(amount)+'金 ('+reason+')');
+  return true;
+}
+function changeHunger(d){
+  state.hunger = Math.max(0, Math.min(100, state.hunger+d));
+  if(state.hunger<=0){ state.hp = Math.max(0,state.hp-1); }
+  refreshHud();
+}
+function raiseCrime(v){
+  state.crimeValue = Math.min(100, state.crimeValue+v);
+  if(state.crimeValue>=80 && !state.wanted){
+    state.wanted = true; state.status='指名手配犯';
+    SND.alarm(); toast('⚠ 指名手配されました!bot警察に発見されると逮捕されます');
+  } else if(state.crimeValue>=60){
+    toast('犯罪値が高まっています。bot警察が警戒中…');
+  }
+  refreshHud();
+}
+function arrestPlayer(){
+  state.wanted=false; state.crimeValue=0; state.status='懲役中';
+  state.jailedUntil = simTime.totalMinutes + (3*7*24*60/ (60/ DAY_LENGTH_MIN)); // 概算: 懲役3週間
+  SND.alarm();
+  toast('🚓 逮捕されました。懲役3週間です。');
+  refreshHud();
+}
+
+/* ---------------------------------------------------------------------------------
+   6. 時間 / 天候システム (1日=24分換算)
+--------------------------------------------------------------------------------- */
+const DAY_LENGTH_MIN = 24; // 実時間24分=ゲーム内1日
+const simTime = { totalMinutes:0, day:1, hour:8, weather:'晴れ' };
+const WEATHERS = ['晴れ','曇り','雨','快晴','霧'];
+function updateTime(deltaSec){
+  simTime.totalMinutes += deltaSec/60;
+  const dayProgress = (simTime.totalMinutes % DAY_LENGTH_MIN)/DAY_LENGTH_MIN;
+  simTime.hour = Math.floor(dayProgress*24);
+  const newDay = Math.floor(simTime.totalMinutes/DAY_LENGTH_MIN)+1;
+  if(newDay !== simTime.day){
+    simTime.day = newDay;
+    onNewDay();
+  }
+  document.getElementById('timeWeather').textContent =
+    String(simTime.hour).padStart(2,'0')+':00 / '+simTime.weather+' / '+simTime.day+'日目';
+}
+let lastWeatherChangeDay=0;
+function onNewDay(){
+  changeHunger(-100/7); // 1週間で食料必須 -> 1日あたり1/7消費
+  if(state.hunger<=30) toast('⚠ お腹が空いています。市場で食料を買いましょう');
+  if(state.hunger<=0) toast('💀 飢餓状態です。HPが減少します');
+  if(simTime.day - lastWeatherChangeDay >= 1){
+    simTime.weather = WEATHERS[Math.floor(Math.random()*WEATHERS.length)];
+    lastWeatherChangeDay = simTime.day;
+  }
+  // 会社員給与・報酬の日次処理(金庫に給与分が無いと支払われず、未払いが続くと退社)
+  if(state.company && state.company.role==='社員'){
+    const c = companies.find(cc=>cc.name===state.company.name);
+    if(c){
+      if(c.treasury >= c.wage){
+        c.treasury -= c.wage;
+        gainMoney(c.wage,'給与');
+        state.unpaidDays = 0;
+      } else {
+        state.unpaidDays = (state.unpaidDays||0)+1;
+        toast('⚠ 会社の金庫不足で給与未払いでした');
+        if(state.unpaidDays>=2){
+          c.employees = c.employees.filter(e=>e.name!==state.name);
+          state.company = null; state.status='ホームレス';
+          toast('給与未払いが続いたため退社しました');
+        }
+      }
+    }
+  }
+  // 農地収入の日次処理
+  if(state.farmPlots && state.farmPlots.length){
+    let total = 0;
+    state.farmPlots.forEach(f=>{ total += f.sellPrice; });
+    if(total>0) gainMoney(total, '農地収穫');
+  }
+  refreshHud();
+}
+
+/* ---------------------------------------------------------------------------------
+   7. THREE.JS ワールド / 一人称カメラ / 移動
+--------------------------------------------------------------------------------- */
+const canvas = document.getElementById('gameCanvas');
+const renderer = new THREE.WebGLRenderer({canvas, antialias:true});
+renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.shadowMap.enabled = true;
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x2a8fd8);
+scene.fog = new THREE.Fog(0x2a8fd8, 60, 240);
+
+const camera = new THREE.PerspectiveCamera(72, window.innerWidth/window.innerHeight, 0.1, 1000);
+camera.position.set(350,1.7,350);
+
+const hemi = new THREE.HemisphereLight(0xffffff, 0x2f5c20, 1.0);
+scene.add(hemi);
+const sun = new THREE.DirectionalLight(0xffffff, 1.1);
+sun.position.set(120,200,80);
+sun.castShadow = true;
+sun.shadow.mapSize.set(1024,1024);
+sun.shadow.camera.left=-300; sun.shadow.camera.right=300; sun.shadow.camera.top=300; sun.shadow.camera.bottom=-300;
+scene.add(sun);
+
+// ----- 地面: ブロックグリッド(700x700、1マス=1m, 表示は中心400x400に簡略=パフォーマンス) -----
+const WORLD_SIZE = 700;
+const BLOCK = 1;
+const groundGroup = new THREE.Group();
+scene.add(groundGroup);
+
+const groundMat = new THREE.MeshLambertMaterial({color:0x2e8b3a});
+const groundGeo = new THREE.PlaneGeometry(WORLD_SIZE, WORLD_SIZE);
+const groundMesh = new THREE.Mesh(groundGeo, groundMat);
+groundMesh.rotation.x = -Math.PI/2;
+groundMesh.position.set(350,0,350);
+groundMesh.receiveShadow = true;
+groundGroup.add(groundMesh);
+
+// グリッド境界線(ブロック1マスごとの四角い境界線) — 描画負荷対策で視点周辺のみ動的生成
+const gridHelperGroup = new THREE.Group();
+scene.add(gridHelperGroup);
+const gridLineMat = new THREE.LineBasicMaterial({color:0x163d12, transparent:true, opacity:0.45});
+function rebuildLocalGrid(centerX, centerZ, radius=18){
+  gridHelperGroup.clear();
+  const pts = [];
+  const minX = Math.floor(centerX-radius), maxX=Math.ceil(centerX+radius);
+  const minZ = Math.floor(centerZ-radius), maxZ=Math.ceil(centerZ+radius);
+  for(let x=minX; x<=maxX; x++){
+    pts.push(new THREE.Vector3(x,0.02,minZ), new THREE.Vector3(x,0.02,maxZ));
+  }
+  for(let z=minZ; z<=maxZ; z++){
+    pts.push(new THREE.Vector3(minX,0.02,z), new THREE.Vector3(maxX,0.02,z));
+  }
+  const geo = new THREE.BufferGeometry().setFromPoints(pts);
+  const lines = new THREE.LineSegments(geo, gridLineMat);
+  gridHelperGroup.add(lines);
+}
+
+// ----- ハイライトブロック(マイクラ風カーソル選択) -----
+const highlightGeo = new THREE.BoxGeometry(1.02,1.02,1.02);
+const highlightMat = new THREE.MeshBasicMaterial({color:0xffffff, transparent:true, opacity:0.35});
+const highlightMesh = new THREE.Mesh(highlightGeo, highlightMat);
+highlightMesh.visible = false;
+scene.add(highlightMesh);
+
+// ----- 設置済みブロック管理 -----
+const placedBlocks = new Map(); // key "x,y,z" -> mesh
+const blockMatCache = {
+  "土ブロック": new THREE.MeshLambertMaterial({color:0x6b4423}),
+  "木壁": new THREE.MeshLambertMaterial({color:0xa8631c}),
+  "石壁": new THREE.MeshLambertMaterial({color:0x6f6f6f}),
+  "オフィスマット": new THREE.MeshLambertMaterial({color:0x4a4a4a}),
+  "家土地マット": new THREE.MeshLambertMaterial({color:0xffffff}),
+  "会社土地マット": new THREE.MeshLambertMaterial({color:0x4a4a4a}),
+  "農地マット": new THREE.MeshLambertMaterial({color:0x5c3315}),
+  "default": new THREE.MeshLambertMaterial({color:0xaa3333}),
+};
+const CATEGORY_COLOR = {
+  "木材系":0x8a5a2a, "石材系":0x707070, "金属系":0x5a6470, "布系":0xb02a4a, "食材系":0xc97a1f,
+  "飲料系":0x1f7ac9, "調理器具系":0x444444, "衣類系":0x7a2ab0, "靴系":0x4a3a2a, "家具系":0xa0682a,
+  "建材系":0x808080, "農業系":0x4a7a1f, "工具系":0x999999, "電化系":0x1f9ec9, "車両系":0xc91f3a,
+  "医療系":0xe04040, "会社系":0x2a4ea8, "法務・警察系":0x1a2a6a, "生活雑貨系":0x3a8a6a, "装飾・高級品系":0xd8a93a
+};
+const DESK_ITEMS = ["社長机","書斎机","木机"];
+function isChestItem(name){
+  const it = findItem(name);
+  if(!it) return false;
+  return it.effect.includes('収納') || name==='木箱';
+}
+const chests = new Map(); // blockKey -> {items: [...]}
+function blockKey(x,y,z){ return x+","+y+","+z; }
+function placeBlockAt(x,y,z,type,cat){
+  const k = blockKey(x,y,z);
+  if(placedBlocks.has(k)) return false;
+  let mat = blockMatCache[type];
+  if(!mat){
+    const color = CATEGORY_COLOR[cat] || 0xaa3333;
+    mat = new THREE.MeshLambertMaterial({color});
+    blockMatCache[type] = mat;
+  }
+  const isMat = type.includes('マット');
+  const geo = new THREE.BoxGeometry(1, isMat?0.12:1, 1);
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.position.set(x+0.5, (isMat?0.06:0.5)+y, z+0.5);
+  mesh.castShadow = true; mesh.receiveShadow = true;
+  mesh.userData.type = type;
+  scene.add(mesh);
+  placedBlocks.set(k, mesh);
+  SND.place();
+  spawnParticle(mesh.position, isMat? (type==='家土地マット'?0xffffff:(type==='農地マット'?0x6b3e1a:0x4a4a4a)) : (mat.color?mat.color.getHex():0xffffff));
+
+  // 家土地マットの上にホームマーカー(⬇️矢印)を表示
+  if(type==='家土地マット'){
+    addHomeMarker(x+0.5, z+0.5);
+  }
+  // 収納系アイテムはチェスト(収納箱)として機能させる
+  if(isChestItem(type)){
+    chests.set(k, {items: new Array(16).fill(null)});
+    mesh.userData.isChest = true;
+  }
+  // 机系アイテムはデスク(社員の労働判定マス)として機能させる
+  if(DESK_ITEMS.includes(type)){
+    mesh.userData.isDesk = true;
+  }
+  return true;
+}
+function breakBlockAt(x,y,z){
+  const k = blockKey(x,y,z);
+  const mesh = placedBlocks.get(k);
+  if(!mesh) return false;
+  scene.remove(mesh);
+  placedBlocks.delete(k);
+  if(chests.has(k)) chests.delete(k);
+  SND.breakBlock();
+  spawnParticle(mesh.position, 0xa8631c);
+  return true;
+}
+
+// ----- 自分の家マーカー(浮いている⬇️) -----
+const homeMarkers = [];
+function addHomeMarker(x,z){
+  // 既存マーカーがあれば再利用せず追加(複数土地に対応)
+  const cv = document.createElement('canvas'); cv.width=64; cv.height=64;
+  const ctx2 = cv.getContext('2d'); ctx2.font='48px serif'; ctx2.textAlign='center'; ctx2.fillText('⬇️',32,48);
+  const tex = new THREE.CanvasTexture(cv);
+  const mat = new THREE.SpriteMaterial({map:tex});
+  const sprite = new THREE.Sprite(mat);
+  sprite.scale.set(1.4,1.4,1.4);
+  sprite.position.set(x, 4.2, z);
+  scene.add(sprite);
+  homeMarkers.push({sprite, baseY:4.2});
+}
+function updateHomeMarkers(t){
+  homeMarkers.forEach((m,i)=>{
+    m.sprite.position.y = m.baseY + Math.sin(t/450 + i)*0.18;
+  });
+}
+
+// ----- 木(伐採対象) -----
+const trees = [];
+function makeTree(x,z){
+  const g = new THREE.Group();
+  const trunkMat = new THREE.MeshLambertMaterial({color:0x5a3414});
+  const leafMat = new THREE.MeshLambertMaterial({color:0x1d6b2c});
+  const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.18,0.22,1.6,7), trunkMat);
+  trunk.position.y=0.8; trunk.castShadow=true;
+  const leaf = new THREE.Mesh(new THREE.SphereGeometry(0.9,8,8), leafMat);
+  leaf.position.y=1.9; leaf.castShadow=true;
+  g.add(trunk); g.add(leaf);
+  g.position.set(x,0,z);
+  g.userData.isTree = true;
+  g.userData.hp = 3;
+  scene.add(g);
+  trees.push(g);
+  return g;
+}
+// 森エリア(指定座標帯)に木を多数配置(本数3倍)
+function scatterForest(){
+  const bands = [[0,150,550,700],[600,700,0,200]]; // 北西/南東 概略
+  bands.forEach(([x0,x1,z0,z1])=>{
+    for(let i=0;i<180;i++){
+      const x = x0+Math.random()*(x1-x0);
+      const z = z0+Math.random()*(z1-z0);
+      makeTree(x,z);
+    }
+  });
+  // 中心近くにも見本の木をいくつか(到達しやすいように)
+  for(let i=0;i<75;i++){
+    const ang = Math.random()*Math.PI*2;
+    const r = 40+Math.random()*60;
+    makeTree(350+Math.cos(ang)*r, 350+Math.sin(ang)*r);
+  }
+}
+scatterForest();
+
+// ----- 固定施設(噴水/市場/警察/不動産/会社街) — 四角い建物は使わず円柱形状にする -----
+function cylinderFacility(name,x,z,radius,h,color,segs=16){
+  const m = new THREE.Mesh(new THREE.CylinderGeometry(radius,radius*1.05,h,segs), new THREE.MeshLambertMaterial({color}));
+  m.position.set(x,h/2,z);
+  m.castShadow=true; m.receiveShadow=true;
+  m.userData.facility = name;
+  scene.add(m);
+  return m;
+}
+// 噴水
+const fountainGroup = new THREE.Group();
+const fountainBase = new THREE.Mesh(new THREE.CylinderGeometry(4,4.4,0.8,20), new THREE.MeshLambertMaterial({color:0xb8c8d8}));
+fountainBase.position.set(350,0.4,350);
+const fountainWater = new THREE.Mesh(new THREE.CylinderGeometry(3.2,3.2,0.3,20), new THREE.MeshPhongMaterial({color:0x1273c4, transparent:true, opacity:0.88, shininess:120}));
+fountainWater.position.set(350,0.85,350);
+fountainGroup.add(fountainBase, fountainWater);
+fountainGroup.userData.facility = '噴水';
+scene.add(fountainGroup);
+
+cylinderFacility('市場', 445, 345, 16, 5, 0xc98a1f, 10);
+cylinderFacility('bot警察署', 262, 342, 9, 6, 0x2a4ea8, 8);
+cylinderFacility('bot不動産', 352, 215, 8.5, 5, 0xb8901f, 8);
+for(let i=0;i<8;i++){ // 会社区画(複数オフィス、円柱)
+  cylinderFacility('会社区画'+i, 300+i*30, 500+(i%3)*30, 8, 5, 0x383838, 8);
+}
+// ※初期から散らばる住宅は配置しない(プレイヤーが不動産で取得し自分で設置する)
+// 農地表示(緑の畝 — 細長い円柱で表現し四角を排除)
+for(let i=0;i<14;i++){
+  const f = new THREE.Mesh(new THREE.CylinderGeometry(1,1,0.3,8), new THREE.MeshLambertMaterial({color:0x5c3315}));
+  f.scale.set(4,1,1);
+  f.position.set(100+(i%7)*16, 0.15, 560+Math.floor(i/7)*16);
+  scene.add(f);
+}
+
+// ----- 他プレイヤー表示用 -----
+const remoteMeshes = {}; // id -> {mesh, label}
+function createPlayerMesh(skin){
+  const g = new THREE.Group();
+  const body = new THREE.Mesh(new THREE.CapsuleGeometry?new THREE.CapsuleGeometry(0.3,0.9,4,8):new THREE.CylinderGeometry(0.3,0.3,1.2,8),
+    new THREE.MeshLambertMaterial({color:0xe8a955}));
+  body.position.y=0.9; body.castShadow=true;
+  g.add(body);
+  // ラベル(絵文字)はCanvasスプライトで表現
+  const cv = document.createElement('canvas'); cv.width=64; cv.height=64;
+  const ctx2 = cv.getContext('2d'); ctx2.font='48px serif'; ctx2.textAlign='center'; ctx2.fillText(skin||"🙂",32,48);
+  const tex = new THREE.CanvasTexture(cv);
+  const spriteMat = new THREE.SpriteMaterial({map:tex});
+  const sprite = new THREE.Sprite(spriteMat);
+  sprite.scale.set(1,1,1); sprite.position.y=2.0;
+  g.add(sprite);
+  return g;
+}
+
+/* ---------------------------------------------------------------------------------
+   8. 入力(移動パッド・視点ドラッグ・行動ボタン)
+--------------------------------------------------------------------------------- */
+const input = { moveX:0, moveZ:0, dashing:false, crouching:false, lookDX:0, lookDY:0 };
+const stickBase = document.getElementById('stickBase');
+const stickKnob = document.getElementById('stickKnob');
+let stickActive=false, stickTouchId=null, stickCenter={x:0,y:0};
+
+function stickStart(x,y,id){
+  stickActive=true; stickTouchId=id;
+  const r = stickBase.getBoundingClientRect();
+  stickCenter = {x:r.left+r.width/2, y:r.top+r.height/2};
+}
+function stickMove(x,y){
+  if(!stickActive) return;
+  let dx=x-stickCenter.x, dy=y-stickCenter.y;
+  const max=42;
+  const dist = Math.hypot(dx,dy);
+  if(dist>max){ dx=dx/dist*max; dy=dy/dist*max; }
+  stickKnob.style.left = (36+dx)+'px';
+  stickKnob.style.top = (36+dy)+'px';
+  input.moveX = dx/max; input.moveZ = dy/max;
+}
+function stickEnd(){
+  stickActive=false; stickTouchId=null;
+  stickKnob.style.left='36px'; stickKnob.style.top='36px';
+  input.moveX=0; input.moveZ=0;
+}
+document.getElementById('moveStick').addEventListener('touchstart', e=>{
+  const t=e.changedTouches[0]; stickStart(t.clientX,t.clientY,t.identifier); e.preventDefault();
+},{passive:false});
+document.getElementById('moveStick').addEventListener('touchmove', e=>{
+  for(const t of e.changedTouches) if(t.identifier===stickTouchId) stickMove(t.clientX,t.clientY);
+  e.preventDefault();
+},{passive:false});
+document.getElementById('moveStick').addEventListener('touchend', stickEnd);
+document.getElementById('moveStick').addEventListener('mousedown', e=>{ stickStart(e.clientX,e.clientY,'mouse'); });
+window.addEventListener('mousemove', e=>{ if(stickActive && stickTouchId==='mouse') stickMove(e.clientX,e.clientY); });
+window.addEventListener('mouseup', e=>{ if(stickTouchId==='mouse') stickEnd(); });
+
+// 視点操作: 画面ドラッグ(スティック・行動ボタン以外の領域)
+let lookActive=false, lookTouchId=null, lastLook={x:0,y:0};
+function isUiTarget(el){
+  return el.closest('#moveStick, #invBar, #leftSide, #rightSide, #hudTop, #menuBtn, #tabBar, #reportBtn, .panelOverlay, #pickupPrompt, #receiveUI');
+}
+canvas.addEventListener('touchstart', e=>{
+  for(const t of e.changedTouches){
+    if(isUiTarget(t.target)) continue;
+    lookActive=true; lookTouchId=t.identifier; lastLook={x:t.clientX,y:t.clientY};
+  }
+},{passive:true});
+canvas.addEventListener('touchmove', e=>{
+  for(const t of e.changedTouches){
+    if(t.identifier!==lookTouchId) continue;
+    const dx=t.clientX-lastLook.x, dy=t.clientY-lastLook.y;
+    applyLook(dx,dy);
+    lastLook={x:t.clientX,y:t.clientY};
+  }
+},{passive:true});
+canvas.addEventListener('touchend', e=>{ for(const t of e.changedTouches) if(t.identifier===lookTouchId) lookActive=false; });
+canvas.addEventListener('mousedown', e=>{ if(!isUiTarget(e.target)){ lookActive=true; lastLook={x:e.clientX,y:e.clientY}; } });
+window.addEventListener('mousemove', e=>{ if(lookActive){ const dx=e.clientX-lastLook.x, dy=e.clientY-lastLook.y; applyLook(dx,dy); lastLook={x:e.clientX,y:e.clientY}; } });
+window.addEventListener('mouseup', ()=>{ lookActive=false; });
+
+let sensitivity=1.0;
+function applyLook(dx,dy){
+  state.yaw -= dx*0.0024*sensitivity;
+  state.pitch -= dy*0.0024*sensitivity;
+  state.pitch = Math.max(-1.3, Math.min(1.3, state.pitch));
+}
+
+// 行動ボタン
+document.getElementById('btnDash').addEventListener('touchstart', ()=>{ input.dashing=true; });
+document.getElementById('btnDash').addEventListener('touchend', ()=>{ input.dashing=false; });
+document.getElementById('btnDash').addEventListener('mousedown', ()=>{ input.dashing=true; });
+document.getElementById('btnDash').addEventListener('mouseup', ()=>{ input.dashing=false; });
+
+document.getElementById('btnCrouch').addEventListener('click', ()=>{
+  input.crouching = !input.crouching;
+  document.getElementById('btnCrouch').classList.toggle('pressed', input.crouching);
+});
+
+document.getElementById('btnSwing').addEventListener('click', ()=>{ pressFx('btnSwing'); doSwing(); });
+document.getElementById('btnHeave').addEventListener('click', ()=>{ pressFx('btnHeave'); doHeave(); });
+document.getElementById('btnUse').addEventListener('click', ()=>{ pressFx('btnUse'); doUse(); });
+document.getElementById('btnPick').addEventListener('click', ()=>{ pressFx('btnPick'); doPickup(); });
+document.getElementById('btnDrop').addEventListener('click', ()=>{ pressFx('btnDrop'); dropSelectedItem(); });
+document.getElementById('btnTalk').addEventListener('click', ()=>{ pressFx('btnTalk'); doTalk(); });
+document.getElementById('btnJump').addEventListener('click', ()=>{ pressFx('btnJump'); tryJump(); });
+
+function pressFx(id){
+  const el = document.getElementById(id);
+  el.classList.add('bouncy');
+  setTimeout(()=>el.classList.remove('bouncy'),500);
+}
+
+// スロット数字キー(デスクトップ用)
+window.addEventListener('keydown', e=>{
+  if(e.key>='1' && e.key<='9'){ state.selectedSlot = parseInt(e.key)-1; renderInventory(); }
+  if(e.key==='0'){ state.selectedSlot=9; renderInventory(); }
+});
+
+/* ---------------------------------------------------------------------------------
+   9. 選択中ブロック/対象の検出(レイキャスト)
+--------------------------------------------------------------------------------- */
+const raycaster = new THREE.Raycaster();
+const centerNDC = new THREE.Vector2(0,0);
+let targetBlock = null; // {x,y,z, exists}
+let targetTree = null;
+let targetFacility = null;
+
+function updateRaycast(){
+  raycaster.setFromCamera(centerNDC, camera);
+  raycaster.far = 6;
+  // 1. 既存ブロックとの当たり判定
+  const blockMeshes = Array.from(placedBlocks.values());
+  let hit = raycaster.intersectObjects(blockMeshes, false)[0];
+  // 2. 木との当たり判定
+  let hitTree = raycaster.intersectObjects(trees, true)[0];
+  // 3. 地面との当たり判定(設置先プレビュー)
+  let hitGround = raycaster.intersectObject(groundMesh, false)[0];
+  // 4. 施設
+  const facilities = scene.children.filter(c=>c.userData && c.userData.facility);
+  let hitFac = raycaster.intersectObjects(facilities, false)[0];
+
+  targetTree = null; targetBlock = null; targetFacility = null;
+  document.getElementById('blockHint').style.display='none';
+  highlightMesh.visible = false;
+
+  if(hitTree && hitTree.distance < 5){
+    let obj = hitTree.object;
+    while(obj.parent && !obj.userData.isTree) obj = obj.parent;
+    targetTree = obj;
+    highlightMesh.visible = true;
+    highlightMesh.position.copy(obj.position).add(new THREE.Vector3(0,0.9,0));
+    document.getElementById('blockHint').style.display='block';
+    document.getElementById('blockHint').textContent = '伐採 (振るボタン)';
+    return;
+  }
+  if(hitFac && hitFac.distance < 5.5){
+    targetFacility = hitFac.object.userData.facility;
+    document.getElementById('blockHint').style.display='block';
+    document.getElementById('blockHint').textContent = targetFacility+' (話すボタンで入る)';
+    return;
+  }
+  if(hit && hit.distance < 5){
+    const p = hit.object.position;
+    targetBlock = {x:Math.floor(p.x), y:Math.round(p.y-0.5), z:Math.floor(p.z), exists:true};
+    highlightMesh.visible = true;
+    highlightMesh.position.set(targetBlock.x+0.5, targetBlock.y+0.5, targetBlock.z+0.5);
+    document.getElementById('blockHint').style.display='block';
+    if(hit.object.userData.isChest){
+      document.getElementById('blockHint').textContent = '収納箱 (拾う/話すボタンで開く・振るで破壊)';
+    } else {
+      document.getElementById('blockHint').textContent = '破壊 (振るボタン)';
+    }
+    return;
+  }
+  if(hitGround && hitGround.distance < 5){
+    const p = hitGround.point;
+    const bx = Math.floor(p.x), bz = Math.floor(p.z);
+    targetBlock = {x:bx, y:0, z:bz, exists:false};
+    highlightMesh.visible = true;
+    highlightMesh.position.set(bx+0.5, 0.5, bz+0.5);
+    document.getElementById('blockHint').style.display='block';
+    document.getElementById('blockHint').textContent = '設置 (振るボタン)';
+  }
+}
+
+/* ---------------------------------------------------------------------------------
+   10. アクション(振る/ふりかざす/使う/拾う/話す)
+--------------------------------------------------------------------------------- */
+function doSwing(){
+  if(targetTree){
+    targetTree.userData.hp -= 1;
+    SND.breakBlock();
+    spawnParticle(targetTree.position.clone().add(new THREE.Vector3(0,1,0)), 0x6b4423);
+    if(targetTree.userData.hp<=0){
+      const treePosForSeed = targetTree.position.clone();
+      scene.remove(targetTree);
+      trees.splice(trees.indexOf(targetTree),1);
+      targetTree=null;
+      const woodItem = findItem('丸棒');
+      addItem(woodItem.id, 1+Math.floor(Math.random()*2));
+      gainMoney(100,'伐採報酬');
+      let msg = '木を伐採しました(丸棒を入手)';
+      if(isInForestBand(treePosForSeed.x, treePosForSeed.z) && Math.random()<0.18){
+        addItem(findItem('種袋').id, 1);
+        msg += ' / 種袋を発見しました!';
+      }
+      toast(msg);
+    } else {
+      toast('木を切っています…('+targetTree.userData.hp+')');
+    }
+    return;
+  }
+  if(targetBlock){
+    if(targetBlock.exists){
+      breakBlockAt(targetBlock.x, targetBlock.y, targetBlock.z);
+      toast('ブロックを破壊しました');
+    } else {
+      const slot = state.inventory[state.selectedSlot];
+      if(!slot){ toast('設置するアイテムがありません'); SND.fail(); return; }
+      const it = findItemById(slot.itemId);
+      const ok = placeBlockAt(targetBlock.x, targetBlock.y, targetBlock.z, it.name, it.cat);
+      if(ok){ removeItemAt(state.selectedSlot,1); toast(it.name+'を設置しました'); }
+    }
+  }
+}
+function doHeave(){
+  // 構え→大きな動作。武器/道具の振りかざし(攻撃力・演出強化版)
+  SND.tone && null;
+  toast('ふりかざした!(大きな一振り)');
+  SND.success();
+  if(targetTree){ targetTree.userData.hp -= 2; spawnParticle(targetTree.position.clone().add(new THREE.Vector3(0,1,0)), 0x6b4423); }
+}
+function doUse(){
+  const slot = state.inventory[state.selectedSlot];
+  if(!slot){ toast('使用するアイテムがありません'); return; }
+  const it = findItemById(slot.itemId);
+  if(it.cat==='食材系' || it.cat==='飲料系'){
+    const recover = it.cat==='食材系'? 18: 10;
+    changeHunger(recover);
+    removeItemAt(state.selectedSlot,1);
+    toast(it.name+'を食べた(満腹+'+recover+')');
+    SND.success();
+  } else if(it.cat==='医療系'){
+    state.hp = Math.min(100, state.hp+25);
+    removeItemAt(state.selectedSlot,1);
+    toast(it.name+'を使用(HP回復)');
+    SND.success();
+  } else {
+    toast(it.name+'を使った('+it.effect+')');
+    SND.craft();
+  }
+  refreshHud();
+}
+let nearbyPickup = null;
+function doPickup(){
+  if(targetBlock && targetBlock.exists && chests.has(blockKey(targetBlock.x,targetBlock.y,targetBlock.z))){ openChest(targetBlock.x,targetBlock.y,targetBlock.z); return; }
+  if(targetFacility){ enterFacility(targetFacility); return; }
+  if(nearbyPickup){
+    addItem(nearbyPickup.itemId, nearbyPickup.qty);
+    toast(nearbyPickup.name+'を拾った');
+    scene.remove(nearbyPickup.mesh);
+    worldDrops.splice(worldDrops.indexOf(nearbyPickup),1);
+    nearbyPickup=null;
+    document.getElementById('pickupPrompt').style.display='none';
+    SND.coin();
+    return;
+  }
+  toast('拾えるものがありません');
+}
+function doTalk(){
+  if(targetBlock && targetBlock.exists && chests.has(blockKey(targetBlock.x,targetBlock.y,targetBlock.z))){ openChest(targetBlock.x,targetBlock.y,targetBlock.z); return; }
+  if(targetFacility){ enterFacility(targetFacility); return; }
+  SND.talk();
+  toast('話しかける相手がいません');
+}
+function enterFacility(fac){
+  SND.door();
+  if(fac.includes('市場')) openPanel('marketPanel');
+  else if(fac.includes('警察')) openPanel('policePanel');
+  else if(fac.includes('不動産')) openPanel('estatePanel');
+  else if(fac.includes('会社')) openPanel('companyPanel');
+  else if(fac==='噴水') openPanel('menuPanel');
+  else toast(fac+'に入りました');
+}
+
+/* ---------------------------------------------------------------------------------
+   11. ワールドドロップ(社員へのお金ドロップ/アイテムドロップ)
+--------------------------------------------------------------------------------- */
+const worldDrops = [];
+function dropSelectedItem(){
+  const slot = state.inventory[state.selectedSlot];
+  if(!slot){ toast('捨てるアイテムがありません'); SND.fail(); return; }
+  const it = findItemById(slot.itemId);
+  dropItemInFront(it.id, 1, it.name);
+  removeItemAt(state.selectedSlot,1);
+  toast(it.name+'を目の前に落としました');
+  SND.place();
+}
+function updateWorldDrops(t){
+  worldDrops.forEach((d,i)=>{
+    d.mesh.position.y = d.baseY + Math.sin(t/350 + i)*0.12;
+    if(!d.money) d.mesh.rotation.y += 0.025;
+  });
+}
+
+/* ---- 収納箱(チェスト)UI ---- */
+let currentChestKey = null;
+function openChest(x,y,z){
+  currentChestKey = blockKey(x,y,z);
+  if(!chests.has(currentChestKey)) chests.set(currentChestKey,{items:new Array(16).fill(null)});
+  openPanel('chestPanel');
+  renderChestPanel();
+  SND.door();
+}
+function renderChestPanel(){
+  if(!currentChestKey) return;
+  const chest = chests.get(currentChestKey);
+  if(!chest) return;
+  const cs = document.getElementById('chestSlots');
+  cs.innerHTML = chest.items.map((s,i)=>{
+    if(!s) return `<div class="slot" onclick=""><span class="slotNum">${i+1}</span></div>`;
+    const it = findItemById(s.itemId);
+    return `<div class="slot" onclick="moveChestToInv(${i})" title="${it.name}"><span>${slotIcon(it.cat)}</span><span class="qty">${s.qty}</span></div>`;
+  }).join('');
+  const is = document.getElementById('chestInvSlots');
+  is.innerHTML = state.inventory.map((s,i)=>{
+    if(!s) return `<div class="slot"><span class="slotNum">${i+1}</span></div>`;
+    const it = findItemById(s.itemId);
+    return `<div class="slot" onclick="moveInvToChest(${i})" title="${it.name}"><span>${slotIcon(it.cat)}</span><span class="qty">${s.qty}</span></div>`;
+  }).join('');
+}
+function moveInvToChest(idx){
+  const slot = state.inventory[idx];
+  if(!slot) return;
+  const chest = chests.get(currentChestKey);
+  if(!chest) return;
+  // 既存スタックへ統合 or 空きスロットへ
+  for(const cs of chest.items){ if(cs && cs.itemId===slot.itemId && cs.qty<60){ const add=Math.min(60-cs.qty, slot.qty); cs.qty+=add; slot.qty-=add; break; } }
+  if(slot.qty>0){
+    const empty = chest.items.findIndex(c=>!c);
+    if(empty>=0){ chest.items[empty] = {itemId:slot.itemId, qty:slot.qty}; slot.qty=0; }
+    else { toast('収納箱がいっぱいです'); }
+  }
+  if(slot.qty<=0) state.inventory[idx]=null;
+  renderInventory(); renderChestPanel();
+  SND.coin();
+}
+function moveChestToInv(idx){
+  const chest = chests.get(currentChestKey);
+  if(!chest) return;
+  const cs = chest.items[idx];
+  if(!cs) return;
+  const ok = addItem(cs.itemId, cs.qty);
+  if(ok){ chest.items[idx]=null; }
+  renderChestPanel();
+  SND.coin();
+}
+function dropItemInFront(itemId, qty, label){
+  const dir = new THREE.Vector3(Math.sin(state.yaw), 0, Math.cos(state.yaw));
+  const pos = camera.position.clone().add(dir.multiplyScalar(1.2)); pos.y=0.55;
+  const it = findItemById(itemId);
+  const color = CATEGORY_COLOR[it ? it.cat : '建材系'] || 0xd8a93a;
+  const geo = new THREE.BoxGeometry(0.28,0.28,0.28);
+  const mat = new THREE.MeshLambertMaterial({color});
+  const mesh = new THREE.Mesh(geo,mat); mesh.position.copy(pos); mesh.castShadow=true;
+  mesh.rotation.set(Math.random()*0.4, Math.random()*Math.PI, Math.random()*0.4);
+  scene.add(mesh);
+  worldDrops.push({mesh, itemId, qty, name:label, pos, baseY:pos.y});
+}
+function dropMoneyInFront(amount){
+  const dir = new THREE.Vector3(Math.sin(state.yaw), 0, Math.cos(state.yaw));
+  const pos = camera.position.clone().add(dir.multiplyScalar(1.2)); pos.y=0.55;
+  const geo = new THREE.SphereGeometry(0.22,10,10);
+  const mat = new THREE.MeshLambertMaterial({color:0xf2d35a});
+  const mesh = new THREE.Mesh(geo,mat); mesh.position.copy(pos);
+  scene.add(mesh);
+  worldDrops.push({mesh, money:amount, name:amount+'金', pos, baseY:pos.y});
+}
+function checkDropProximity(){
+  let found=null;
+  for(const d of worldDrops){
+    const dist = camera.position.distanceTo(d.pos);
+    if(dist<1.6){ found=d; break; }
+  }
+  if(found && found.money){
+    document.getElementById('receiveUI').style.display='flex';
+    document.getElementById('pickupPrompt').style.display='none';
+    document.getElementById('receiveLabel').textContent = found.name+' を受け取りますか?';
+    pendingReceive = found;
+  } else if(found){
+    nearbyPickup = found;
+    document.getElementById('pickupPrompt').style.display='block';
+    document.getElementById('receiveUI').style.display='none';
+  } else {
+    nearbyPickup=null;
+    if(!targetFacility) document.getElementById('pickupPrompt').style.display='none';
+    document.getElementById('receiveUI').style.display='none';
+  }
+}
+let pendingReceive=null;
+function receiveAnswer(yes){
+  if(pendingReceive && yes){
+    gainMoney(pendingReceive.money,'受け取り');
+    scene.remove(pendingReceive.mesh);
+    worldDrops.splice(worldDrops.indexOf(pendingReceive),1);
+  }
+  pendingReceive=null;
+  document.getElementById('receiveUI').style.display='none';
+}
+
+/* ---------------------------------------------------------------------------------
+   12. パーティクル(気持ちいい演出)
+--------------------------------------------------------------------------------- */
+const particles = [];
+function spawnParticle(pos,color){
+  for(let i=0;i<6;i++){
+    const geo = new THREE.SphereGeometry(0.05,4,4);
+    const mat = new THREE.MeshBasicMaterial({color});
+    const m = new THREE.Mesh(geo,mat);
+    m.position.copy(pos);
+    const vel = new THREE.Vector3((Math.random()-0.5)*2, Math.random()*2.5, (Math.random()-0.5)*2);
+    scene.add(m);
+    particles.push({mesh:m, vel, life:0.7});
+  }
+}
+function updateParticles(dt){
+  for(let i=particles.length-1;i>=0;i--){
+    const p = particles[i];
+    p.vel.y -= 6*dt;
+    p.mesh.position.addScaledVector(p.vel, dt);
+    p.life -= dt;
+    p.mesh.scale.setScalar(Math.max(0,p.life/0.7));
+    if(p.life<=0){ scene.remove(p.mesh); particles.splice(i,1); }
+  }
+}
+
+/* ---------------------------------------------------------------------------------
+   13. 移動・物理 (指定数値を正確反映)
+--------------------------------------------------------------------------------- */
+const MOVE = {
+  walk:4.5, run:6.8, crouch:2.3, back:3.6, strafe:4.1,
+  jumpHeight:1.15, gravity: -2*1.15/(0.55*0.55), // h = 1/2 g t^2 (滞空0.55s換算の半分=上昇時間)
+  standEye:1.7, crouchEye:1.05,
+};
+let velocityY = 0;
+let onGround = true;
+let walkCycle = 0;
+let eyeHeight = MOVE.standEye;
+
+function tryJump(){
+  if(onGround){
+    velocityY = Math.sqrt(2*Math.abs(MOVE.gravity)*MOVE.jumpHeight);
+    onGround = false;
+    SND.jump();
+  }
+}
+document.getElementById('btnPick'); // noop ref guard
+
+window.addEventListener('keydown', e=>{ if(e.code==='Space') tryJump(); });
+
+function updateMovement(dt){
+  const speed = input.crouching ? MOVE.crouch : (input.dashing ? MOVE.run : MOVE.walk);
+  const forward = new THREE.Vector3(Math.sin(state.yaw), 0, Math.cos(state.yaw));
+  const right = new THREE.Vector3(Math.sin(state.yaw+Math.PI/2),0,Math.cos(state.yaw+Math.PI/2));
+
+  const mx = input.moveX, mz = -input.moveZ; // 上が前進
+  const moving = Math.hypot(mx,mz) > 0.08;
+
+  let moveVec = new THREE.Vector3();
+  moveVec.addScaledVector(forward, mz);
+  moveVec.addScaledVector(right, mx);
+  if(moveVec.lengthSq()>0) moveVec.normalize();
+
+  const accel = input.dashing? 0.12 : 0.08;
+  const targetSpeed = moving? speed : 0;
+  // 簡易加減速(指定の加速時間に近似)
+  camera.userData.curSpeed = camera.userData.curSpeed||0;
+  camera.userData.curSpeed += (targetSpeed - camera.userData.curSpeed) * Math.min(1, dt/accel);
+
+  const disp = moveVec.multiplyScalar(camera.userData.curSpeed*dt);
+  camera.position.x += disp.x;
+  camera.position.z += disp.z;
+  camera.position.x = Math.max(2, Math.min(WORLD_SIZE-2, camera.position.x));
+  camera.position.z = Math.max(2, Math.min(WORLD_SIZE-2, camera.position.z));
+
+  // しゃがみによる視点の高さ変化(なめらかに遷移)
+  const targetEye = input.crouching ? MOVE.crouchEye : MOVE.standEye;
+  eyeHeight += (targetEye - eyeHeight) * Math.min(1, dt/0.18);
+
+  // 重力/ジャンプ
+  velocityY += MOVE.gravity*dt;
+  camera.position.y += velocityY*dt;
+  if(camera.position.y <= eyeHeight){ camera.position.y=eyeHeight; velocityY=0; if(!onGround){onGround=true; SND.land();} }
+  else if(onGround){ camera.position.y = eyeHeight; }
+
+  // カメラ揺れ(歩き/走り)
+  if(moving && onGround){
+    walkCycle += dt*(input.dashing?10:6.5);
+    const bob = Math.sin(walkCycle)*(input.dashing?0.045:0.025)*(input.crouching?0.4:1);
+    camera.position.y += bob;
+    if(Math.floor(walkCycle/Math.PI) !== Math.floor((walkCycle-dt*(input.dashing?10:6.5))/Math.PI)){
+      SND.step();
+    }
+  }
+
+  camera.rotation.order='YXZ';
+  camera.rotation.y = state.yaw;
+  camera.rotation.x = state.pitch;
+
+  state.pos.x = camera.position.x; state.pos.z = camera.position.z;
+}
+
+function updateWork(dt){
+  if(!state.company || state.company.role!=='社員') return;
+  const bx = Math.floor(camera.position.x), bz = Math.floor(camera.position.z);
+  const mesh = placedBlocks.get(blockKey(bx,0,bz));
+  if(mesh && mesh.userData.isDesk){
+    state.workSeconds += dt;
+    state.workTickAccum += dt;
+    if(state.workTickAccum >= 10){
+      state.workTickAccum -= 10;
+      state.trust = Math.min(100, state.trust+1);
+      const co = companies.find(c=>c.name===state.company.name);
+      if(co){
+        co.treasury += 30; // 社員が働くと社長に神報酬(会社金庫)が入る
+        toast('💼 勤務実績+10秒(信頼:'+state.trust+') 社長に神報酬+30金が入りました');
+      }
+      refreshHud();
+    }
+  }
+}
+function updateMiniMap(){
+  const mm = document.getElementById('miniMap');
+  mm.innerHTML='';
+  const selfDot = document.createElement('div');
+  selfDot.className='mmDot mmSelf';
+  const px = (state.pos.x/WORLD_SIZE)*110, pz=(state.pos.z/WORLD_SIZE)*110;
+  selfDot.style.left = px+'px'; selfDot.style.top = pz+'px';
+  mm.appendChild(selfDot);
+  for(const id in remoteMeshes){
+    const r = remoteMeshes[id];
+    const d = document.createElement('div'); d.className='mmDot';
+    d.style.left = ((r.x/WORLD_SIZE)*110)+'px'; d.style.top=((r.z/WORLD_SIZE)*110)+'px';
+    mm.appendChild(d);
+  }
+}
+
+/* ---------------------------------------------------------------------------------
+   15. ウィンドウリサイズ
+--------------------------------------------------------------------------------- */
+window.addEventListener('resize', ()=>{
+  camera.aspect = window.innerWidth/window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+/* ---------------------------------------------------------------------------------
+   16. パネル開閉
+--------------------------------------------------------------------------------- */
+function openPanel(id){
+  document.getElementById(id).style.display='flex';
+  if(id==='housePanel') houseTab('craft');
+  if(id==='companyPanel') renderCompanyPanel();
+  if(id==='marketPanel') renderMarketPanel();
+  if(id==='estatePanel') renderEstatePanel();
+  if(id==='policePanel') renderPolicePanel();
+  SND.notify();
+}
+function closePanel(id){ document.getElementById(id).style.display='none'; }
+document.getElementById('menuBtn').addEventListener('click', ()=>openPanel('menuPanel'));
+
+/* ---------------------------------------------------------------------------------
+   17. 家パネル(クラフト/収納/掲示板/服デザイン/土地管理)
+--------------------------------------------------------------------------------- */
+function houseTab(tab){
+  document.querySelectorAll('#housePanel .miniTabs button').forEach(b=>b.classList.toggle('active', b.dataset.h===tab));
+  const c = document.getElementById('houseContent');
+  if(tab==='craft'){
+    let html = `<div class="smallNote">設計を選んでクラフトします(素材消費あり)。15回相当の選択肢を簡略統合し、カテゴリ→アイテムの2段階選択で再現しています。</div>`;
+    html += `<select id="craftCat" onchange="renderCraftItems()">`+Object.keys(ITEM_DB).map(c=>`<option>${c}</option>`).join('')+`</select>`;
+    html += `<div id="craftItemList"></div>`;
+    c.innerHTML = html;
+    renderCraftItems();
+  } else if(tab==='storage'){
+    let html = `<div class="smallNote">収納箱(強化段階: ${state.storageLevel||1})</div>`;
+    html += `<button onclick="upgradeStorage()">収納箱を強化(500金, 容量+5スロット相当)</button>`;
+    html += `<div class="smallNote" style="margin-top:8px">所持品一覧:</div>`;
+    state.inventory.forEach((s,i)=>{
+      if(!s) return;
+      const it = findItemById(s.itemId);
+      html += `<div class="itemRow"><span class="nm">${it.name} ×${s.qty}</span><span class="ds">${it.desc}</span></div>`;
+    });
+    c.innerHTML = html;
+  } else if(tab==='board'){
+    c.innerHTML = `<div class="smallNote">家の掲示板(自由メモ)</div>
+      <input type="text" id="boardNote" placeholder="メモを書く" value="${state.boardNote||''}">
+      <button onclick="state.boardNote=document.getElementById('boardNote').value; toast('掲示板を更新しました')">保存</button>`;
+  } else if(tab==='design'){
+    c.innerHTML = `<div class="smallNote">服デザイン: 素材(布系アイテム)を消費してデザイン値を上げ、高級販売価格を引き上げます。</div>
+      <div>現在のデザイン値: <b id="designVal">${state.designValue||0}</b></div>
+      <button onclick="craftDesign()">布切れ×3を消費してデザイン+5(発光/刺繍演出)</button>`;
+  } else if(tab==='land'){
+    let html = `<div class="smallNote">所有土地一覧</div>`;
+    if(state.ownedLand.length===0) html += `<div class="smallNote">所有していません。不動産で購入してください。</div>`;
+    state.ownedLand.forEach(l=>{
+      const matName = l.type==='農地' ? '農地マット' : (l.type==='住宅区画' ? '家土地マット' : '会社土地マット');
+      html += `<div class="itemRow"><span class="nm">${l.type} (${l.x},${l.z})</span>
+        <button onclick="placeLandMat(${l.x},${l.z},'${matName}')">マットを敷く(${matName})</button></div>`;
+      if(l.type==='農地'){
+        html += `<div class="itemRow"><span class="ds">この土地に種を植える(種袋を消費)</span>
+          <button onclick="plantSeedOnFarm(${l.x},${l.z})">種を植える</button></div>`;
+      }
+    });
+    if(state.farmPlots && state.farmPlots.length){
+      html += `<div class="smallNote" style="margin-top:8px">植え付け済みの畑(1日ごとに収入が入ります):</div>`;
+      state.farmPlots.forEach(f=>{
+        html += `<div class="itemRow"><span class="nm">(${f.x},${f.z}) ${f.seedName}</span><span class="tag">毎日 +${f.sellPrice}金</span></div>`;
+      });
+    }
+    c.innerHTML = html;
+  }
+}
+function renderCraftItems(){
+  const cat = document.getElementById('craftCat').value;
+  const list = document.getElementById('craftItemList');
+  list.innerHTML = ITEM_DB[cat].map(([name,desc,effect,price])=>{
+    return `<div class="itemRow"><span><span class="nm">${name}</span><br><span class="ds">${desc} / ${effect}</span></span>
+      <button onclick="craftItem('${name.replace(/'/g,"\\'")}')">作成</button></div>`;
+  }).join('');
+}
+function craftItem(name){
+  const it = findItem(name);
+  if(!it){ return; }
+  // 簡易素材コスト: 売値の40%相当の金を消費(資材ロジックの代用として一貫運用)
+  const cost = Math.ceil(it.basePrice*0.4);
+  if(!spendMoney(cost,'クラフト素材費')) return;
+  addItem(it.id,1);
+  SND.craft();
+  toast(it.name+'を作成しました!');
+}
+function upgradeStorage(){
+  if(!spendMoney(500,'収納箱強化')) return;
+  state.storageLevel = (state.storageLevel||1)+1;
+  toast('収納箱を強化しました(Lv.'+state.storageLevel+')');
+  houseTab('storage');
+}
+function craftDesign(){
+  if(countItem(findItem('布切れ').id) < 3){ toast('布切れが足りません'); SND.fail(); return; }
+  state.inventory.forEach((s,i)=>{ if(s && s.itemId===findItem('布切れ').id){ removeItemAt(i, Math.min(3,s.qty)); } });
+  state.designValue = (state.designValue||0)+5;
+  toast('デザイン値が上昇しました(発光・刺繍が追加)');
+  SND.success();
+  document.getElementById('designVal').textContent = state.designValue;
+}
+function placeLandMat(x,z,matType){
+  placeBlockAt(Math.floor(x), 0, Math.floor(z), matType);
+  toast(matType+'を敷設しました(地面が盛り上がります)');
+}
+function farmUnlocked(){
+  return !!state.company || countItem(findItem('会社土地マット').id) >= COMPANY_MAT_REQUIRED;
+}
+function plantSeedOnFarm(x,z){
+  if(!farmUnlocked()){ toast('農業は会社を作れる段階(会社所属、または会社土地マット50個)に達すると解放されます'); SND.fail(); return; }
+  const hiMat = findItem('高級農地マット');
+  if(countItem(hiMat.id) < 1){ toast('種を植えるには「高級農地マット」が1個必要です(不動産で購入できます)'); SND.fail(); return; }
+  const seed = findItem('種袋');
+  const idx = state.inventory.findIndex(s=>s && s.itemId===seed.id);
+  if(idx<0){ toast('種袋がありません(森で木を伐採すると稀に入手できます)'); SND.fail(); return; }
+  const hiIdx = state.inventory.findIndex(s=>s && s.itemId===hiMat.id);
+  removeItemAt(hiIdx,1);
+  removeItemAt(idx,1);
+  state.farmPlots = state.farmPlots || [];
+  state.farmPlots.push({x:Math.floor(x), z:Math.floor(z), seedName:seed.name, sellPrice:seed.price});
+  toast('高級農地マットを使って種を植えました!1日ごとに売値合計が収入として入ります');
+  SND.craft();
+  houseTab('land');
+}
+
+/* ---------------------------------------------------------------------------------
+   18. 会社パネル
+--------------------------------------------------------------------------------- */
+const COMPANY_MAT_REQUIRED = 50;
+function renderCompanyPanel(){
+  const c = document.getElementById('companyContent');
+  let html = '';
+  if(!state.company){
+    const companyMat = findItem('会社土地マット');
+    const haveMats = countItem(companyMat.id);
+    const canFound = haveMats >= COMPANY_MAT_REQUIRED;
+    html += `<div class="smallNote">会社を設立するには「会社土地マット」を${COMPANY_MAT_REQUIRED}個以上所持している必要があります(現在 ${haveMats}/${COMPANY_MAT_REQUIRED})。さらに設立費 3000金、オフィス設置費 1000金。</div>
+      <input type="text" id="newCompanyName" placeholder="会社名">
+      <button class="companyFoundBtn" ${canFound?'':'disabled'} onclick="foundCompany()">🏢 会社を設立する</button>
+      <div class="smallNote" style="margin-top:10px">既存の会社に応募:</div>`;
+    companies.forEach(co=>{
+      html += `<div class="itemRow"><span class="nm">${co.name}</span><span class="ds">社員${co.employees.length}/${co.maxEmployees} 給与目安${co.wage}金/日</span>
+        <button onclick="joinCompany(${co.id})">応募</button></div>`;
+    });
+    if(companies.length===0) html += `<div class="smallNote">現在、設立済みの会社はありません。</div>`;
+  } else {
+    const co = companies.find(cc=>cc.name===state.company.name);
+    html += `<div class="smallNote">所属: ${co.name} (${state.company.role}) / 金庫: ${co.treasury}金</div>`;
+    if(state.company.role==='社長'){
+      html += `<div class="itemRow"><span>金庫へ入金</span>
+        <span><button onclick="depositTreasury(${co.id},500)">+500金</button> <button onclick="depositTreasury(${co.id},2000)">+2000金</button></span></div>`;
+      html += `<div class="itemRow"><span>社員枠拡張(+5, 800金)</span><button onclick="expandCompany(${co.id})">拡張</button></div>`;
+      html += `<div class="smallNote" style="margin-top:6px">社員一覧:</div>`;
+      co.employees.forEach((e,i)=>{
+        html += `<div class="itemRow"><span class="nm">${e.name}</span><span>給与${e.wage}金/日</span>
+          <span><button onclick="dropMoneyToEmployee(${co.id},${i})">前へドロップ</button> <button onclick="dismissEmployee(${co.id},${i})">解雇</button></span></div>`;
+      });
+      html += `<div class="itemRow"><span>掲示板で指示を出す</span>
+        <input type="text" id="orderText" placeholder="例: 市場へ売りに行け">
+        <button onclick="postOrder(${co.id})">投稿</button></div>`;
+      html += `<div class="smallNote">後継者: ${co.heir||'未設定'}</div>
+        <input type="text" id="heirInput" placeholder="後継者名">
+        <button onclick="setHeir(${co.id})">後継者を設定</button>`;
+      html += `<button onclick="acquireOtherCompany()">他社買収を試みる(3000金)</button>`;
+    } else {
+      html += `<div class="itemRow"><span>市場に売りに行く権利</span><span class="tag">有効</span></div>`;
+      html += `<div class="itemRow"><span>信頼度</span><span class="tag">${state.trust}</span></div>`;
+      html += `<div class="itemRow"><span>累計労働時間</span><span class="tag">${Math.floor(state.workSeconds)}秒</span></div>`;
+      html += `<div class="smallNote">社長机/書斎机/木机のマスに立っていると、その秒数が労働実績になります(10秒ごとに信頼+1)。</div>`;
+      html += `<div class="smallNote">掲示板の指示: ${co.orders && co.orders.length? co.orders[co.orders.length-1] : 'なし'}</div>`;
+      html += `<button onclick="leaveCompany()">退社する</button>`;
+    }
+  }
+  c.innerHTML = html;
+}
+function depositTreasury(id,amount){
+  const co = companies.find(c=>c.id===id);
+  if(!spendMoney(amount,'金庫へ入金')) return;
+  co.treasury += amount;
+  toast('金庫に'+amount+'金を入金しました');
+  renderCompanyPanel();
+}
+let companyIdSeq=1;
+function foundCompany(){
+  const companyMat = findItem('会社土地マット');
+  if(countItem(companyMat.id) < COMPANY_MAT_REQUIRED){ toast('会社土地マットが'+COMPANY_MAT_REQUIRED+'個以上必要です'); SND.fail(); return; }
+  const name = document.getElementById('newCompanyName').value.trim();
+  if(!name){ toast('会社名を入力してください'); return; }
+  if(!spendMoney(4000,'会社設立+オフィス設置(3000+1000)')) return;
+  const co = {id:companyIdSeq++, name, owner:state.name, employees:[], maxEmployees:5, wage:80, treasury:0, orders:[], heir:null};
+  companies.push(co);
+  state.company = {name:co.name, role:'社長'};
+  state.status='会社社長';
+  toast('🎉 会社「'+name+'」を設立しました!');
+  SND.success();
+  // 会社の浮遊ネームプレートを自分の現在地付近に設置(12マス上をゆっくり周回)
+  addCompanyLabel(co, camera.position.x, camera.position.z);
+  renderCompanyPanel(); refreshHud();
+}
+function joinCompany(id){
+  const co = companies.find(c=>c.id===id);
+  if(!co){ return; }
+  if(co.employees.length>=co.maxEmployees){ toast('社員枠が満員です'); return; }
+  const chance = Math.min(95, 40 + co.wage/5); // 給与が高いほど入社しやすい
+  if(Math.random()*100 > chance){
+    toast('応募が通りませんでした(給与が低いようです。応募成功率:約'+Math.round(chance)+'%)');
+    SND.fail();
+    return;
+  }
+  co.employees.push({name:state.name, wage:co.wage});
+  state.company = {name:co.name, role:'社員'};
+  state.status='会社員';
+  state.unpaidDays=0;
+  toast(co.name+'に入社しました!(応募成功率:約'+Math.round(chance)+'%)');
+  SND.success();
+  renderCompanyPanel(); refreshHud();
+}
+function leaveCompany(){
+  const co = companies.find(c=>c.name===state.company.name);
+  if(co) co.employees = co.employees.filter(e=>e.name!==state.name);
+  state.company=null; state.status='ホームレス';
+  toast('退社しました');
+  renderCompanyPanel(); refreshHud();
+}
+function expandCompany(id){
+  const co = companies.find(c=>c.id===id);
+  if(!spendMoney(800,'社員枠拡張')) return;
+  co.maxEmployees += 5;
+  toast('社員枠を拡張しました('+co.maxEmployees+')');
+  renderCompanyPanel();
+}
+function dismissEmployee(id,idx){
+  const co = companies.find(c=>c.id===id);
+  co.employees.splice(idx,1);
+  renderCompanyPanel();
+}
+function dropMoneyToEmployee(id,idx){
+  if(!spendMoney(50,'社員へドロップ')) return;
+  dropMoneyInFront(50);
+  toast('社員の1マス前にお金をドロップしました');
+}
+function postOrder(id){
+  const co = companies.find(c=>c.id===id);
+  const txt = document.getElementById('orderText').value.trim();
+  if(!txt) return;
+  co.orders.push(txt);
+  toast('掲示板に指示を投稿しました');
+  renderCompanyPanel();
+}
+function setHeir(id){
+  const co = companies.find(c=>c.id===id);
+  co.heir = document.getElementById('heirInput').value.trim();
+  toast('後継者を設定しました: '+co.heir);
+  renderCompanyPanel();
+}
+function acquireOtherCompany(){
+  const target = companies.find(c=>c.name!==state.company.name);
+  if(!target){ toast('買収対象の会社がありません'); return; }
+  if(!spendMoney(3000,'他社買収')) return;
+  toast(target.name+'を買収しました(統合)');
+  companies = companies.filter(c=>c!==target);
+  SND.success();
+  renderCompanyPanel();
+}
+
+/* ---------------------------------------------------------------------------------
+   18b. 会社の浮遊ネームプレート(建物の12マス上をゆっくり周回しながら社名表示)
+--------------------------------------------------------------------------------- */
+const companyLabels = []; // {sprite, cx, cz, angle, radius, height}
+function makeTextSprite(text, opts={}){
+  const padding = 16;
+  const fontSize = opts.fontSize || 40;
+  const cv = document.createElement('canvas');
+  const ctx2 = cv.getContext('2d');
+  ctx2.font = `bold ${fontSize}px "Hiragino Sans","Yu Gothic",sans-serif`;
+  const textWidth = ctx2.measureText(text).width;
+  cv.width = textWidth + padding*2;
+  cv.height = fontSize + padding*2;
+  ctx2.font = `bold ${fontSize}px "Hiragino Sans","Yu Gothic",sans-serif`;
+  ctx2.fillStyle = 'rgba(255,255,255,0.9)';
+  ctx2.beginPath();
+  ctx2.roundRect ? ctx2.roundRect(0,0,cv.width,cv.height,16) : ctx2.rect(0,0,cv.width,cv.height);
+  ctx2.fill();
+  ctx2.strokeStyle = '#3f8f4f'; ctx2.lineWidth=4;
+  ctx2.stroke();
+  ctx2.fillStyle = '#23341f';
+  ctx2.textAlign='center'; ctx2.textBaseline='middle';
+  ctx2.fillText(text, cv.width/2, cv.height/2+2);
+  const tex = new THREE.CanvasTexture(cv);
+  const mat = new THREE.SpriteMaterial({map:tex});
+  const sprite = new THREE.Sprite(mat);
+  const scale = (opts.scale||1);
+  sprite.scale.set((cv.width/cv.height)*1.6*scale, 1.6*scale, 1);
+  return sprite;
+}
+function addCompanyLabel(co, x, z){
+  const sprite = makeTextSprite('🏢 '+co.name);
+  scene.add(sprite);
+  companyLabels.push({sprite, cx:x, cz:z, angle:Math.random()*Math.PI*2, radius:3, height:12});
+}
+function updateCompanyLabels(dt){
+  companyLabels.forEach(l=>{
+    l.angle += dt*0.25; // ゆっくり回転
+    l.sprite.position.set(
+      l.cx + Math.cos(l.angle)*l.radius,
+      l.height,
+      l.cz + Math.sin(l.angle)*l.radius
+    );
+  });
+}
+
+/* ---------------------------------------------------------------------------------
+   19. 市場パネル(需要供給による相場変動)
+--------------------------------------------------------------------------------- */
+function renderMarketPanel(){
+  const tabs = document.getElementById('marketCatTabs');
+  tabs.innerHTML = Object.keys(ITEM_DB).map(c=>`<button onclick="renderMarketList('${c}')">${c}</button>`).join('');
+  renderMarketList('食材系');
+}
+function renderMarketList(cat){
+  document.querySelectorAll('#marketCatTabs button').forEach(b=>b.classList.toggle('active', b.textContent===cat));
+  const list = document.getElementById('marketContent');
+  list.innerHTML = ITEM_DB[cat].map(([name])=>{
+    const it = findItem(name);
+    const owned = countItem(it.id);
+    return `<div class="itemRow">
+      <span><span class="nm">${it.name}</span> <span class="tag">${Math.round(it.price)}金</span><br><span class="ds">${it.desc}</span></span>
+      <span>
+        <button onclick="marketBuy(${it.id})">購入</button>
+        <button onclick="marketSell(${it.id})" ${owned<=0?'disabled':''}>売る(${owned})</button>
+      </span>
+    </div>`;
+  }).join('');
+}
+function adjustPrice(it, delta){
+  // 需要供給モデル: demand-supplyの差で価格を±最大40%まで変動
+  it.demand = Math.max(0, Math.min(100, it.demand + (delta>0?6:-4)));
+  it.supply = Math.max(0, Math.min(100, it.supply + (delta>0?-4:6)));
+  const ratio = (it.demand - it.supply)/100; // -1〜1
+  it.price = Math.round(it.basePrice * (1 + Math.max(-0.4, Math.min(0.4, ratio))));
+}
+function marketBuy(id){
+  const it = findItemById(id);
+  if(!spendMoney(it.price, it.name+'購入')) return;
+  addItem(it.id,1);
+  adjustPrice(it, +1);
+  SND.coin();
+  renderMarketList(it.cat);
+}
+function marketSell(id){
+  if(!state.company){ toast('市場で売るには会社に勤める必要があります(会社員になると売却権が発生します)'); SND.fail(); return; }
+  const it = findItemById(id);
+  const slotIdx = state.inventory.findIndex(s=>s && s.itemId===id);
+  if(slotIdx<0){ toast('在庫がありません'); return; }
+  removeItemAt(slotIdx,1);
+  gainMoney(it.price, it.name+'売却');
+  adjustPrice(it, -1);
+  renderMarketList(it.cat);
+}
+
+/* ---------------------------------------------------------------------------------
+   20. 不動産パネル
+--------------------------------------------------------------------------------- */
+function renderEstatePanel(){
+  let html = `<div class="smallNote">空き土地一覧(タップで購入。空き土地への引っ越しは無料です)。購入すると土地の種類に応じた土地マットを10個受け取れます(家=白/会社・商業=灰/農地=茶)。</div>`;
+  landPlots.filter(l=>!l.owner).slice(0,20).forEach(l=>{
+    html += `<div class="itemRow"><span class="nm">${l.type} (${l.x},${l.z})</span><span class="tag">${l.price}金</span>
+      <button onclick="buyLand(${l.id})">購入</button></div>`;
+  });
+  html += `<div class="smallNote" style="margin-top:10px">高級農地マット(種を植えるために必要)</div>
+    <button onclick="buyPremiumFarmMat()">高級農地マットを購入(500金/個)</button>`;
+  html += `<div class="smallNote" style="margin-top:10px">家を購入(ローン可)</div>
+    <button onclick="buyHouse(false)">一括購入(家:600金)</button>
+    <button onclick="buyHouse(true)">ローンで購入(頭金200金+分割)</button>`;
+  document.getElementById('estateContent').innerHTML = html;
+}
+function buyPremiumFarmMat(){
+  if(!spendMoney(500,'高級農地マット購入')) return;
+  addItem(findItem('高級農地マット').id, 1);
+  toast('高級農地マットを購入しました');
+  SND.coin();
+}
+function buyLand(id){
+  const l = landPlots.find(p=>p.id===id);
+  if(!l || l.owner){ return; }
+  if(!spendMoney(l.price, l.type+'購入')) return;
+  l.owner = state.name;
+  state.ownedLand.push(l);
+  state.status = state.status==='ホームレス' ? '土地所有者' : state.status;
+  // 土地の種類に応じたマットを10個付与
+  let matName, matColorLabel;
+  if(l.type==='住宅区画'){ matName='家土地マット'; matColorLabel='白'; }
+  else if(l.type==='農地'){ matName='農地マット'; matColorLabel='茶'; }
+  else { matName='会社土地マット'; matColorLabel='灰'; } // 商業区画/会社区画
+  const matItem = findItem(matName);
+  addItem(matItem.id, 10);
+  toast(l.type+'を取得しました!'+matName+'('+matColorLabel+')を10個受け取りました');
+  SND.success();
+  spawnParticle(new THREE.Vector3(l.x,1,l.z), 0xd8a93a);
+  refreshHud(); renderEstatePanel();
+}
+function buyHouse(loan){
+  if(state.ownedLand.length===0){ toast('先に土地を購入してください'); return; }
+  if(loan){
+    if(!spendMoney(200,'家頭金')) return;
+    state.houseLoan = {remaining:400, perDay:20};
+    toast('ローンで家を取得しました(分割返済: 1日20金)');
+  } else {
+    if(!spendMoney(600,'家購入')) return;
+    toast('家を一括購入しました');
+  }
+  state.ownedHouse = true;
+  state.status='家所有者';
+  SND.success();
+  refreshHud();
+}
+
+/* ---------------------------------------------------------------------------------
+   21. 警察パネル
+--------------------------------------------------------------------------------- */
+function renderPolicePanel(){
+  let html = `<div class="smallNote">通報受付 / 指名手配掲示板 / 収監状況</div>
+    <div class="itemRow"><span>あなたの犯罪値</span><span class="tag">${state.crimeValue}</span></div>
+    <div class="itemRow"><span>指名手配状態</span><span class="tag">${state.wanted?'手配中':'なし'}</span></div>`;
+  if(state.status==='懲役中'){
+    const remain = Math.max(0, Math.ceil((state.jailedUntil - simTime.totalMinutes)/DAY_LENGTH_MIN));
+    html += `<div class="itemRow"><span>収監状況</span><span class="tag">残り約${remain}日</span></div>
+      <button onclick="tryRelease()">釈放条件を確認</button>`;
+  } else {
+    html += `<button onclick="reportNearby()">この場で通報する</button>`;
+  }
+  document.getElementById('policeContent').innerHTML = html;
+}
+function reportNearby(){
+  raiseCrime(0); // 通報自体は自分の犯罪値を上げない(通報は他者対象という仕様だが単独デモのため自己完結)
+  state.reportCount++;
+  toast('📣 通報しました(受付済み)');
+  SND.alarm();
+  if(state.reportCount>=4){ toast('2時間以内に4件以上の通報が集まりました(指名手配条件に近づいています)'); }
+}
+function tryRelease(){
+  if(simTime.totalMinutes >= state.jailedUntil){
+    state.status='ホームレス';
+    toast('釈放されました');
+    SND.success();
+    refreshHud(); renderPolicePanel();
+  } else {
+    toast('まだ釈放条件を満たしていません');
+  }
+}
+// botパトロール(簡易AI): 一定間隔で指名手配中のプレイヤーを検出して逮捕判定
+setInterval(()=>{
+  if(state.wanted && Math.random()<0.15){
+    arrestPlayer();
+    renderPolicePanel();
+  }
+}, 8000);
+
+/* ---------------------------------------------------------------------------------
+   22. テレポート(噴水→隣丁)
+--------------------------------------------------------------------------------- */
+function teleportToWorld(dir){
+  const map = {north:1,south:2,east:3,west:4};
+  let target = state.world;
+  if(dir==='north') target = state.world<4? state.world+1:1;
+  if(dir==='south') target = state.world>1? state.world-1:4;
+  if(dir==='east') target = (state.world%4)+1;
+  if(dir==='west') target = ((state.world+2)%4)+1;
+  state.world = target;
+  camera.position.set(350,1.7,350);
+  toast('現世'+target+'へテレポートしました');
+  SND.door();
+  refreshHud();
+  closePanel('menuPanel');
+}
+
+/* ---------------------------------------------------------------------------------
+   23. WebRTC 手動シグナリング(P2P, 位置/チャット同期)
+--------------------------------------------------------------------------------- */
+const net = (()=>{
+  let pc=null, dc=null, isOfferer=false;
+  const config = { iceCandidatePoolSize:4 }; // STUNなし=同一LAN/手動環境向け。必要に応じ追加可。
+  function setStatus(t){ document.getElementById('netStatus').textContent = t; }
+
+  function setupPC(){
+    pc = new RTCPeerConnection(config);
+    pc.onicecandidate = ()=>{}; // ICE収集完了を待ってSDPをまとめて表示(トリクル無し簡易方式)
+    pc.onconnectionstatechange = ()=>{ setStatus('接続状態: '+pc.connectionState); };
+    pc.ondatachannel = (e)=>{ dc = e.channel; bindChannel(dc); };
+  }
+  function bindChannel(channel){
+    channel.onopen = ()=>{ setStatus('✅ 接続済み(同期中)'); };
+    channel.onmessage = (e)=>{
+      try{
+        const msg = JSON.parse(e.data);
+        handleRemoteMessage(msg);
+      }catch(err){}
+    };
+  }
+  function waitIceComplete(){
+    return new Promise(resolve=>{
+      if(pc.iceGatheringState==='complete'){ resolve(); return; }
+      function check(){
+        if(pc.iceGatheringState==='complete'){ pc.removeEventListener('icegatheringstatechange', check); resolve(); }
+      }
+      pc.addEventListener('icegatheringstatechange', check);
+    });
+  }
+  async function createOffer(){
+    setupPC();
+    isOfferer=true;
+    dc = pc.createDataChannel('sync');
+    bindChannel(dc);
+    const offer = await pc.createOffer();
+    await pc.setLocalDescription(offer);
+    await waitIceComplete();
+    document.getElementById('localSDP').value = JSON.stringify(pc.localDescription);
+    setStatus('Offer作成完了。これを相手に送ってください。');
+  }
+  async function createAnswerFromOffer(){
+    const remoteText = document.getElementById('remoteSDP').value.trim();
+    if(!remoteText){ toast('相手のOffer(SDP)を貼り付けてください'); return; }
+    setupPC();
+    isOfferer=false;
+    const offerDesc = JSON.parse(remoteText);
+    await pc.setRemoteDescription(offerDesc);
+    const answer = await pc.createAnswer();
+    await pc.setLocalDescription(answer);
+    await waitIceComplete();
+    document.getElementById('localSDP').value = JSON.stringify(pc.localDescription);
+    setStatus('Answer作成完了。これを相手に送ってください。');
+  }
+  async function acceptRemote(){
+    const remoteText = document.getElementById('remoteSDP').value.trim();
+    if(!remoteText){ toast('相手のSDPを貼り付けてください'); return; }
+    if(!pc){ toast('先にOfferを作成してください'); return; }
+    const desc = JSON.parse(remoteText);
+    if(pc.signalingState!=='stable'){
+      await pc.setRemoteDescription(desc);
+      setStatus('Answerを適用しました。接続を待っています…');
+    } else {
+      toast('既に接続済み、または順序が違います');
+    }
+  }
+  function send(obj){
+    if(dc && dc.readyState==='open'){ dc.send(JSON.stringify(obj)); }
+  }
+  function handleRemoteMessage(msg){
+    if(msg.t==='move'){
+      let r = remoteMeshes[msg.id];
+      if(!r){
+        const mesh = createPlayerMesh(msg.skin);
+        scene.add(mesh);
+        r = remoteMeshes[msg.id] = {mesh, x:msg.x, z:msg.z, name:msg.name};
+      }
+      r.x=msg.x; r.z=msg.z; r.name=msg.name;
+      r.mesh.position.set(msg.x, 0, msg.z);
+      r.mesh.rotation.y = msg.yaw||0;
+    } else if(msg.t==='chat'){
+      toast('💬 '+msg.name+': '+msg.text);
+      SND.notify();
+    } else if(msg.t==='wanted'){
+      toast('🚓 '+msg.name+'さんが指名手配されました');
+    }
+  }
+  setInterval(()=>{
+    send({t:'move', id:'self', x:state.pos.x, z:state.pos.z, yaw:state.yaw, name:state.name, skin:state.skin});
+  }, 1000/15); // 15Hz位置同期
+  return { createOffer, createAnswerFromOffer, acceptRemote, send };
+})();
+
+/* ---------------------------------------------------------------------------------
+   24. タイトル/スキン選択
+--------------------------------------------------------------------------------- */
+const skinRow = document.getElementById('skinPickRow');
+SKINS_DEFAULT.forEach(s=>{
+  const d = document.createElement('div');
+  d.className='skinOpt'+(s===state.skin?' sel':'');
+  d.textContent=s;
+  d.onclick = ()=>{
+    document.querySelectorAll('.skinOpt').forEach(o=>o.classList.remove('sel'));
+    d.classList.add('sel'); state.skin=s;
+  };
+  skinRow.appendChild(d);
+});
+document.getElementById('customSkinInput').addEventListener('input', e=>{
+  if(e.target.value){ state.skin = e.target.value; document.querySelectorAll('.skinOpt').forEach(o=>o.classList.remove('sel')); }
+});
+document.querySelectorAll('.worldBtn').forEach(b=>{
+  b.addEventListener('click', ()=>{
+    document.querySelectorAll('.worldBtn').forEach(x=>x.classList.remove('sel'));
+    b.classList.add('sel');
+    state.world = parseInt(b.dataset.w);
+  });
+});
+document.getElementById('startBtn').addEventListener('click', ()=>{
+  state.name = document.getElementById('nameInput').value.trim() || 'プレイヤー';
+  SND.init();
+  document.getElementById('titleScreen').style.display='none';
+  refreshHud();
+  toast('「'+state.name+'」として現世'+state.world+'に出生しました(ホームレス状態)');
+});
+document.getElementById('netBtn').addEventListener('click', ()=>{ openPanel('signalingOverlay'); });
+
+document.getElementById('volRange').addEventListener('input', e=>{ SND.setVolume(e.target.value/100); });
+document.getElementById('sensRange').addEventListener('input', e=>{ sensitivity = e.target.value/100; });
+
+/* ---------------------------------------------------------------------------------
+   25. メインループ
+--------------------------------------------------------------------------------- */
+let lastT = performance.now();
+function animate(){
+  requestAnimationFrame(animate);
+  const now = performance.now();
+  const dt = Math.min(0.05,(now-lastT)/1000);
+  lastT = now;
+
+  updateMovement(dt);
+  updateWork(dt);
+  updateParticles(dt);
+  updateRaycast();
+  checkDropProximity();
+  updateTime(dt*60); // ゲーム内時間は実時間より少し速め(調整可能)
+  rebuildLocalGrid(camera.position.x, camera.position.z);
+  updateMiniMap();
+  updateHomeMarkers(now);
+  updateWorldDrops(now);
+  updateCompanyLabels(dt);
+
+  // 噴水演出: 軽い上下浮動
+  fountainWater.position.y = 0.85 + Math.sin(now/400)*0.02;
+
+  renderer.render(scene, camera);
+}
+animate();
+
+// 初期ヒント
+window.addEventListener('load', ()=>{
+  setTimeout(()=>toast('ヒント: 画面をドラッグして視点操作、木に近づいて「振る」で伐採できます'), 1500);
+});
+</script>
+</body>
+</html>
