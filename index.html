@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>クラフトワールドジャパン</title>
 <style>
   :root{
@@ -11,14 +11,17 @@
     --shadow: 0 4px 14px rgba(0,0,0,0.25);
   }
   *{box-sizing:border-box; -webkit-tap-highlight-color:transparent; user-select:none;}
-  html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden;background:var(--bg);
-    font-family:"Hiragino Sans","Yu Gothic",sans-serif; color:var(--text);}
+  html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden;background:#000;
+    font-family:"Hiragino Sans","Yu Gothic",sans-serif; color:var(--text);
+    position:fixed; inset:0;}
+  #gameRoot{position:fixed; inset:0; width:100%; height:100%; background:var(--bg); overflow:hidden;}
   #gameCanvas{position:absolute;inset:0;width:100%;height:100%;display:block;}
   #crosshair{
     position:absolute; top:50%; left:50%; width:10px; height:10px; transform:translate(-50%,-50%);
     border:2px solid rgba(40,40,40,0.8); border-radius:50%; pointer-events:none; z-index:50;
     box-shadow:0 0 4px rgba(255,255,255,0.8);
   }
+  #crosshair.placeMode{ border-color:rgba(31,158,62,0.95); }
   #blockHint{
     position:absolute; left:50%; top:calc(50% + 22px); transform:translate(-50%,0);
     font-size:12px; background:rgba(255,255,255,0.85); padding:2px 8px; border-radius:6px;
@@ -26,75 +29,89 @@
   }
 
   /* ---------- TOP HUD ---------- */
-  #hudTop{position:absolute; top:8px; left:8px; right:8px; display:flex; justify-content:space-between; z-index:40; pointer-events:none;}
-  .statPanel{background:var(--panel); border:1px solid var(--panel-border); border-radius:10px; padding:6px 10px; box-shadow:var(--shadow); pointer-events:auto; font-size:12px; min-width:150px;}
-  .barRow{display:flex; align-items:center; gap:6px; margin:2px 0;}
-  .barLabel{width:38px; font-size:11px; opacity:0.75;}
-  .barOuter{flex:1; height:8px; background:#dde5d8; border-radius:5px; overflow:hidden;}
+  #hudTop{position:absolute; top:6px; left:6px; right:6px; display:flex; justify-content:space-between; z-index:40; pointer-events:none;}
+  .statPanel{background:var(--panel); border:1px solid var(--panel-border); border-radius:10px; padding:4px 8px; box-shadow:var(--shadow); pointer-events:auto; font-size:11px; min-width:130px; max-width:42vw;}
+  .barRow{display:flex; align-items:center; gap:5px; margin:2px 0;}
+  .barLabel{width:32px; font-size:10px; opacity:0.75;}
+  .barOuter{flex:1; height:7px; background:#dde5d8; border-radius:5px; overflow:hidden;}
   .barInner{height:100%; border-radius:5px; transition:width .2s;}
   #hpBar{background:#e0554a;} #hungerBar{background:#e0a23a;}
-  #moneyLine{font-weight:bold; margin-top:4px; color:var(--gold);}
-  #wantedLine{color:var(--danger); font-weight:bold; display:none;}
-  #companyLine{font-size:11px; opacity:0.8; margin-top:2px;}
+  #moneyLine{font-weight:bold; margin-top:3px; color:var(--gold); font-size:11px;}
+  #wantedLine{color:var(--danger); font-weight:bold; display:none; font-size:11px;}
+  #companyLine{font-size:10px; opacity:0.8; margin-top:2px;}
 
-  #miniMapWrap{background:var(--panel); border:1px solid var(--panel-border); border-radius:10px; padding:6px; box-shadow:var(--shadow); pointer-events:auto; text-align:center;}
-  #miniMap{width:110px; height:110px; border-radius:6px; background:#cfe3c8; position:relative; overflow:hidden; border:1px solid #b7c9ae;}
-  .mmDot{position:absolute; width:6px; height:6px; border-radius:50%; background:#2a6e9e; transform:translate(-50%,-50%);}
-  .mmSelf{background:#c0392b !important; width:7px; height:7px;}
-  #timeWeather{font-size:11px; margin-top:4px;}
+  #miniMapWrap{background:var(--panel); border:1px solid var(--panel-border); border-radius:10px; padding:4px; box-shadow:var(--shadow); pointer-events:auto; text-align:center;}
+  #miniMap{width:78px; height:78px; border-radius:6px; background:#cfe3c8; position:relative; overflow:hidden; border:1px solid #b7c9ae;}
+  .mmDot{position:absolute; width:5px; height:5px; border-radius:50%; background:#2a6e9e; transform:translate(-50%,-50%);}
+  .mmSelf{background:#c0392b !important; width:6px; height:6px;}
+  #timeWeather{font-size:9px; margin-top:3px;}
 
   /* ---------- BOTTOM HUD ---------- */
   #invBar{
-    position:absolute; bottom:8px; left:50%; transform:translateX(-50%);
-    display:flex; gap:5px; z-index:40; background:var(--panel); padding:6px; border-radius:12px; box-shadow:var(--shadow);
+    position:absolute; bottom:4px; left:50%; transform:translateX(-50%);
+    display:flex; gap:4px; z-index:40; background:var(--panel); padding:4px; border-radius:10px; box-shadow:var(--shadow);
+    max-width:64vw; overflow-x:auto;
   }
   .slot{
-    width:46px; height:46px; background:#f4f7f1; border:2px solid var(--panel-border); border-radius:8px;
-    display:flex; align-items:center; justify-content:center; font-size:20px; position:relative; cursor:pointer;
+    width:38px; height:38px; min-width:38px; background:#f4f7f1; border:2px solid var(--panel-border); border-radius:8px;
+    display:flex; align-items:center; justify-content:center; font-size:17px; position:relative; cursor:pointer;
   }
   .slot.selected{border-color:var(--accent); box-shadow:0 0 0 2px var(--accent) inset;}
-  .slot .qty{position:absolute; bottom:1px; right:3px; font-size:10px; color:#333; background:rgba(255,255,255,0.7); border-radius:4px; padding:0 2px;}
-  .slot .slotNum{position:absolute; top:1px; left:3px; font-size:8px; opacity:0.5;}
+  .slot .qty{position:absolute; bottom:0; right:2px; font-size:9px; color:#333; background:rgba(255,255,255,0.7); border-radius:4px; padding:0 2px;}
+  .slot .slotNum{position:absolute; top:0; left:2px; font-size:7px; opacity:0.5;}
 
-  #moveStick{position:absolute; left:14px; bottom:14px; width:120px; height:120px; z-index:45;}
+  /* Stick bottom-left, save button placed near it but not overlapping */
+  #moveStick{position:absolute; left:10px; bottom:10px; width:100px; height:100px; z-index:45;}
   #stickBase{width:100%; height:100%; border-radius:50%; background:rgba(63,143,79,0.15); border:2px solid rgba(63,143,79,0.4); position:relative;}
-  #stickKnob{width:48px; height:48px; border-radius:50%; background:rgba(63,143,79,0.7); position:absolute; left:36px; top:36px; box-shadow:0 2px 6px rgba(0,0,0,0.3);}
+  #stickKnob{width:40px; height:40px; border-radius:50%; background:rgba(63,143,79,0.7); position:absolute; left:30px; top:30px; box-shadow:0 2px 6px rgba(0,0,0,0.3);}
 
-  #leftSide{position:absolute; left:14px; bottom:150px; display:flex; flex-direction:column; gap:8px; z-index:45;}
-  #rightSide{position:absolute; right:14px; bottom:14px; display:grid; grid-template-columns:repeat(2,64px); gap:8px; z-index:45;}
+  #saveBtn{
+    position:absolute; left:10px; bottom:118px; z-index:46; width:60px; height:34px; border-radius:10px;
+    background:var(--panel); border:2px solid var(--accent); color:var(--accent); font-size:11px; font-weight:bold;
+    box-shadow:var(--shadow); display:flex; align-items:center; justify-content:center; cursor:pointer;
+  }
+  #saveBtn.flash{ background:var(--accent); color:#fff; }
+  #saveStatus{position:absolute; left:10px; bottom:156px; z-index:46; font-size:9px; background:rgba(255,255,255,0.85); padding:2px 6px; border-radius:6px; box-shadow:var(--shadow); opacity:0.85;}
+
+  /* Right side action buttons: 3x2 non-overlapping grid, jump moved near placement buttons */
+  #rightSide{position:absolute; right:8px; bottom:8px; display:grid; grid-template-columns:repeat(3,52px); grid-auto-rows:52px; gap:6px; z-index:45;}
+  #leftBottomSide{position:absolute; left:120px; bottom:8px; display:grid; grid-template-columns:repeat(2,46px); grid-auto-rows:46px; gap:6px; z-index:45;}
   .actBtn{
-    width:64px; height:64px; border-radius:50%; background:var(--panel); border:2px solid var(--panel-border);
-    box-shadow:var(--shadow); display:flex; align-items:center; justify-content:center; font-size:12px; text-align:center;
-    color:var(--text); font-weight:bold; cursor:pointer; line-height:1.1; transition:transform .08s;
+    width:52px; height:52px; border-radius:50%; background:var(--panel); border:2px solid var(--panel-border);
+    box-shadow:var(--shadow); display:flex; align-items:center; justify-content:center; font-size:10px; text-align:center;
+    color:var(--text); font-weight:bold; cursor:pointer; line-height:1.05; transition:transform .08s;
   }
   .actBtn:active, .actBtn.pressed{transform:scale(0.88); background:#e3ede0;}
-  .actBtn.small{width:46px; height:46px; font-size:10px;}
-  #btnSwing{background:#fce7c8;} #btnHeave{background:#fcd6c0; width:50px; height:50px;}
+  .actBtn.small{width:42px; height:42px; font-size:9px;}
+  #btnSwing{background:#fce7c8; grid-column:span 2; width:auto !important; border-radius:16px;}
+  #btnHeave{background:#fcd6c0;}
   #btnUse{background:#d8ecff;} #btnPick{background:#e4f7e0;} #btnTalk{background:#f0e0fa;}
   #btnDash{background:#fff3c2;} #btnCrouch{background:#e8e8e8;} #btnJump{background:#cdeaff;}
+  #btnDrop{background:#ffe0e0;}
 
-  #menuBtn{position:absolute; top:8px; right:130px; z-index:46; width:42px;height:42px;border-radius:50%;
-    background:var(--panel); border:1px solid var(--panel-border); box-shadow:var(--shadow); font-size:18px; cursor:pointer;}
+  #menuBtn{position:absolute; top:6px; right:6px; z-index:48; width:36px;height:36px;border-radius:50%;
+    background:var(--panel); border:1px solid var(--panel-border); box-shadow:var(--shadow); font-size:16px; cursor:pointer;}
 
-  #tabBar{position:absolute; right:8px; top:60%; transform:translateY(-50%); display:flex; flex-direction:column; gap:8px; z-index:44;}
-  .tabBtn{width:54px; padding:8px 0; border-radius:10px 0 0 10px; background:var(--panel); border:1px solid var(--panel-border);
-    box-shadow:var(--shadow); font-size:11px; text-align:center; cursor:pointer;}
+  /* タブ欄: ボタンより手前(高z-index) */
+  #tabBar{position:absolute; right:6px; top:48px; display:flex; flex-direction:row; gap:5px; z-index:47; flex-wrap:wrap; max-width:200px; justify-content:flex-end;}
+  .tabBtn{padding:6px 8px; border-radius:8px; background:var(--panel); border:1px solid var(--panel-border);
+    box-shadow:var(--shadow); font-size:10px; text-align:center; cursor:pointer;}
 
-  #reportBtn{position:absolute; left:8px; top:46%; z-index:44; background:var(--panel); border:1px solid var(--danger);
-    color:var(--danger); border-radius:10px; padding:6px 8px; font-size:11px; box-shadow:var(--shadow); cursor:pointer;}
+  #reportBtn{position:absolute; left:6px; top:48%; z-index:47; background:var(--panel); border:1px solid var(--danger);
+    color:var(--danger); border-radius:10px; padding:5px 7px; font-size:10px; box-shadow:var(--shadow); cursor:pointer;}
 
-  #centerMsg{position:absolute; left:50%; top:30%; transform:translateX(-50%); z-index:60; pointer-events:none; text-align:center;}
-  .toast{background:rgba(20,30,15,0.85); color:#fff; padding:6px 14px; border-radius:20px; margin-bottom:6px; font-size:13px; animation:fadeUp 2.4s forwards;}
+  #centerMsg{position:absolute; left:50%; top:22%; transform:translateX(-50%); z-index:60; pointer-events:none; text-align:center;}
+  .toast{background:rgba(20,30,15,0.85); color:#fff; padding:5px 12px; border-radius:20px; margin-bottom:5px; font-size:12px; animation:fadeUp 2.4s forwards;}
   @keyframes fadeUp{0%{opacity:0; transform:translateY(6px);} 12%{opacity:1; transform:translateY(0);} 80%{opacity:1;} 100%{opacity:0; transform:translateY(-10px);}}
 
   #pickupPrompt, #receiveUI{
-    position:absolute; left:50%; bottom:120px; transform:translateX(-50%); z-index:55; display:none;
+    position:absolute; left:50%; bottom:100px; transform:translateX(-50%); z-index:55; display:none;
   }
   #pickupPrompt button, #receiveUI button{
-    padding:10px 18px; border-radius:24px; border:none; font-weight:bold; font-size:13px; box-shadow:var(--shadow); cursor:pointer;
+    padding:8px 14px; border-radius:24px; border:none; font-weight:bold; font-size:12px; box-shadow:var(--shadow); cursor:pointer;
   }
-  #receiveUI{display:none; flex-direction:column; align-items:center; gap:6px;}
-  #receiveUI .row{display:flex; gap:10px;}
+  #receiveUI{display:none; flex-direction:column; align-items:center; gap:5px;}
+  #receiveUI .row{display:flex; gap:8px;}
   .btnYes{background:var(--accent); color:#fff;}
   .btnNo{background:#ddd; color:#333;}
   .bouncy{animation:bounce .5s ease;}
@@ -107,16 +124,17 @@
   }
   .panelBox{
     width:min(640px,94vw); max-height:88vh; overflow-y:auto; background:var(--panel); border-radius:16px;
-    padding:16px; box-shadow:0 10px 30px rgba(0,0,0,0.3); border:1px solid var(--panel-border);
+    padding:14px; box-shadow:0 10px 30px rgba(0,0,0,0.3); border:1px solid var(--panel-border);
   }
-  .panelBox h2{margin:0 0 10px; font-size:18px; border-bottom:2px solid var(--accent); padding-bottom:6px;}
+  .panelBox h2{margin:0 0 10px; font-size:17px; border-bottom:2px solid var(--accent); padding-bottom:6px;}
   .panelClose{float:right; cursor:pointer; font-size:20px; background:#eee; border-radius:50%; width:30px; height:30px; text-align:center; line-height:30px;}
   .miniTabs{display:flex; gap:6px; margin-bottom:10px; flex-wrap:wrap;}
   .miniTabs button{padding:6px 10px; border-radius:8px; border:1px solid var(--panel-border); background:#f4f7f1; font-size:12px; cursor:pointer;}
   .miniTabs button.active{background:var(--accent); color:#fff;}
-  .itemRow{display:flex; justify-content:space-between; align-items:center; padding:6px 4px; border-bottom:1px solid #eee; font-size:12px;}
+  .itemRow{display:flex; justify-content:space-between; align-items:center; padding:6px 4px; border-bottom:1px solid #eee; font-size:12px; gap:6px;}
   .itemRow .nm{font-weight:bold;}
   .itemRow .ds{opacity:0.65; font-size:11px;}
+  .itemRow .rc{opacity:0.55; font-size:10px; display:block;}
   .itemRow button{padding:4px 10px; border-radius:8px; border:none; background:var(--accent2); color:#fff; font-size:11px; cursor:pointer;}
   input[type=text], input[type=number]{padding:6px 8px; border-radius:6px; border:1px solid var(--panel-border); width:100%; margin:4px 0; font-size:13px;}
   .smallNote{font-size:11px; opacity:0.65;}
@@ -132,17 +150,18 @@
 
   #titleScreen, #lobbyScreen{
     position:absolute; inset:0; z-index:500; background:linear-gradient(160deg,#eef4ea,#dcebd6);
-    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:14px; text-align:center; padding:20px;
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:12px; text-align:center; padding:16px;
+    overflow-y:auto;
   }
-  #titleScreen h1{font-size:30px; color:var(--accent); margin:0;}
+  #titleScreen h1{font-size:26px; color:var(--accent); margin:0;}
   .worldBtnRow{display:flex; gap:10px;}
-  .worldBtn{width:64px;height:64px;border-radius:14px;background:var(--panel);border:2px solid var(--panel-border);
-    font-size:20px; font-weight:bold; cursor:pointer; box-shadow:var(--shadow);}
+  .worldBtn{width:56px;height:56px;border-radius:14px;background:var(--panel);border:2px solid var(--panel-border);
+    font-size:18px; font-weight:bold; cursor:pointer; box-shadow:var(--shadow);}
   .worldBtn.sel{border-color:var(--accent); background:#eaf6e8;}
-  #titleScreen input{width:240px;}
-  .bigBtn{padding:12px 30px; border-radius:30px; border:none; background:var(--accent); color:#fff; font-size:15px; font-weight:bold; box-shadow:var(--shadow); cursor:pointer;}
-  #skinPickRow{display:flex; flex-wrap:wrap; gap:6px; max-width:320px; justify-content:center;}
-  .skinOpt{width:40px;height:40px;border-radius:10px;background:#fff;border:2px solid var(--panel-border);font-size:20px;display:flex;align-items:center;justify-content:center;cursor:pointer;}
+  #titleScreen input{width:220px;}
+  .bigBtn{padding:10px 24px; border-radius:30px; border:none; background:var(--accent); color:#fff; font-size:14px; font-weight:bold; box-shadow:var(--shadow); cursor:pointer;}
+  #skinPickRow{display:flex; flex-wrap:wrap; gap:6px; max-width:300px; justify-content:center;}
+  .skinOpt{width:38px;height:38px;border-radius:10px;background:#fff;border:2px solid var(--panel-border);font-size:18px;display:flex;align-items:center;justify-content:center;cursor:pointer;}
   .skinOpt.sel{border-color:var(--gold); background:#fff7e0;}
 
   #signalingBox textarea{width:100%; height:70px; font-size:10px;}
@@ -150,9 +169,23 @@
   .remoteRow{display:flex; justify-content:space-between; padding:3px 0; border-bottom:1px dashed #ddd;}
 
   ::-webkit-scrollbar{width:6px;} ::-webkit-scrollbar-thumb{background:#bbb; border-radius:3px;}
+
+  /* ---------- Landscape mobile optimization: shrink HUD further, no extra blank space ---------- */
+  @media (orientation:landscape) and (max-height:480px){
+    .statPanel{font-size:10px; padding:3px 6px; min-width:110px;}
+    #miniMap{width:60px; height:60px;}
+    .actBtn{width:46px; height:46px; font-size:9px;}
+    .actBtn.small{width:38px; height:38px;}
+    #rightSide{grid-template-columns:repeat(3,46px); grid-auto-rows:46px;}
+    #leftBottomSide{left:108px; grid-template-columns:repeat(2,40px); grid-auto-rows:40px;}
+    #moveStick{width:84px; height:84px;}
+    #stickKnob{width:34px; height:34px; left:25px; top:25px;}
+    .slot{width:32px; height:32px; min-width:32px; font-size:14px;}
+  }
 </style>
 </head>
 <body>
+<div id="gameRoot">
 
 <!-- ============ TITLE SCREEN ============ -->
 <div id="titleScreen">
@@ -165,14 +198,15 @@
     <button class="worldBtn" data-w="4">現世4</button>
   </div>
   <input type="text" id="nameInput" placeholder="名前を入力" maxlength="10" value="プレイヤー">
-  <div class="smallNote">スキン(絵文字)を選択 — 自分からは見えません(相手から見えます)</div>
+  <div class="smallNote">スキン(絵文字)を選択 — 相手からはあなたのスキンが見えます</div>
   <div id="skinPickRow"></div>
   <input type="text" id="customSkinInput" placeholder="好きな絵文字を入力してスキンに" maxlength="4" style="width:200px;text-align:center;">
-  <div style="display:flex; gap:10px;">
+  <div style="display:flex; gap:10px; flex-wrap:wrap; justify-content:center;">
     <button class="bigBtn" id="startBtn">この現世で始める</button>
+    <button class="bigBtn" style="background:#888" id="continueBtn">続きから(セーブデータ)</button>
     <button class="bigBtn" style="background:var(--accent2)" id="netBtn">通信設定(WebRTC)</button>
   </div>
-  <div class="smallNote">音量・設定は右上メニューからいつでも変更できます</div>
+  <div class="smallNote">音量・設定は右上メニューからいつでも変更できます。自動的に60秒ごとにオートセーブされます。</div>
 </div>
 
 <!-- ============ SIGNALING / NET PANEL ============ -->
@@ -245,20 +279,22 @@
 <div id="invBar"></div>
 
 <div id="moveStick"><div id="stickBase"><div id="stickKnob"></div></div></div>
+<div id="saveBtn" onclick="manualSave()">💾保存</div>
+<div id="saveStatus">未保存</div>
 
-<div id="leftSide">
-  <div class="actBtn small" id="btnCrouch">しゃがみ</div>
+<div id="leftBottomSide">
+  <div class="actBtn small" id="btnCrouch">しゃがみ<br>(設置反転)</div>
   <div class="actBtn small" id="btnDash">ダッシュ</div>
-  <div class="actBtn small" id="btnJump">ジャンプ</div>
 </div>
 
 <div id="rightSide">
-  <div class="actBtn" id="btnTalk">話す</div>
+  <div class="actBtn" id="btnJump">ジャンプ</div>
   <div class="actBtn" id="btnPick">拾う</div>
+  <div class="actBtn" id="btnTalk">話す</div>
   <div class="actBtn" id="btnUse">使う</div>
-  <div class="actBtn" id="btnDrop" style="background:#ffe0e0;">🔘<br>捨てる</div>
+  <div class="actBtn" id="btnDrop">捨てる</div>
   <div class="actBtn" id="btnHeave">ふりかざす</div>
-  <div class="actBtn" id="btnSwing" style="grid-column:1/3; width:auto;">振る(設置/破壊)</div>
+  <div class="actBtn" id="btnSwing">振る(設置/破壊)</div>
 </div>
 
 <!-- ============ PANEL: HOUSE ============ -->
@@ -292,7 +328,7 @@
     <span class="panelClose" onclick="closePanel('marketPanel')">×</span>
     <h2>市場</h2>
     <div class="miniTabs" id="marketCatTabs"></div>
-    <div class="smallNote">相場はプレイヤーの売買で需要供給に応じて変動します(±最大40%)。</div>
+    <div class="smallNote">相場はプレイヤーの売買で需要供給に応じて変動します(±最大40%)。「購入可否=売却のみ」のものは購入できません。</div>
     <div id="marketContent"></div>
   </div>
 </div>
@@ -343,9 +379,10 @@
         <button onclick="teleportToWorld('west')">西</button>
       </span>
     </div>
-    <div class="itemRow"><span>操作説明</span><span class="smallNote">左パッドで移動/右ボタン群で行動/画面ドラッグで視点</span></div>
+    <div class="itemRow"><span>操作説明</span><span class="smallNote">左下パッドで移動/右下ボタン群で行動/画面ドラッグで視点/しゃがみで設置反転</span></div>
     <div class="itemRow"><span>通信</span><button onclick="closePanel('menuPanel');openPanel('signalingOverlay')">WebRTC設定を開く</button></div>
     <div class="itemRow"><span>現在の現世</span><span id="worldLabel">現世1</span></div>
+    <div class="itemRow"><span>セーブデータ</span><button onclick="manualSave()">今すぐ保存</button> <button onclick="if(confirm('セーブデータを削除しますか?')){localStorage.removeItem(SAVE_KEY); toast('削除しました');}">削除</button></div>
   </div>
 </div>
 
@@ -353,272 +390,297 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
 /* ===================================================================================
-   クラフトワールドジャパン — コアエンジン
-   1人称3D / ブロックグリッド / インベントリ / 経済 / 警察 / WebRTC手動シグナリング / 音
+   クラフトワールドジャパン — コアエンジン (更新版)
    =================================================================================== */
 
 /* ---------------------------------------------------------------------------------
-   0. 全アイテムデータ(20ジャンル × 各10種、名前/描写/効果/売値)
+   0. 全アイテムデータ — ユーザー指定の21ジャンル(木材/石材/金属/布/食材/飲料/調理器具/
+      衣類/靴/家具/建材/農業/工具/電化/車両/医療/会社/法務警察/生活雑貨/装飾高級品/種)
+      各項目: [名前, 描写, 効果, レシピ, 売値, 購入可否(true=可 / false=売却のみ)]
 --------------------------------------------------------------------------------- */
 const ITEM_DB = {
-  "木材系": [
-    ["丸棒","削りたての木の香りが残る、手に馴染む細い棒。","軽量、汎用",20],
-    ["板材","木目がまっすぐ通った、扱いやすい平たい木材。","建築、加工基礎",25],
-    ["木箱","釘跡は少し荒いが、素朴で頼れる収納箱。","収納+10",35],
-    ["木槌","叩くたびに乾いた音が響く、素直な木の槌。","叩く、修理",30],
-    ["柄棒","表面がなめらかに磨かれた、握りやすい棒。","つかむ、振る",18],
-    ["木車輪","軽く回るが、どこか温もりのある木製の輪。","移動補助",40],
-    ["木椅子","座るとわずかに軋む、安心感のある木の椅子。","休憩、回復",45],
-    ["木盾","木目の上に補強が走る、素朴で堅い盾。","防御上昇",50],
-    ["梁材","太く長く、家の骨組みを支える頼もしさがある。","建築強化",55],
-    ["高級木札","漆の艶が静かに光る、刻印入りの上質な札。","装飾、贈答",80]
-  ],
-  "石材系": [
-    ["石ころ包み","布に包まれた、重くて投げやすい石の束。","投擲、重み",18],
-    ["石板","表面が平らで、文字や掲示に向く石の板。","建材、掲示",24],
-    ["石杭","先端が尖り、地面に刺さりやすい石の杭。","設置、牽制",28],
-    ["石槌","重みがそのまま力になる、素朴で無骨な槌。","叩く、耐久高",32],
-    ["砥石","指でなぞるとざらりと返る、刃を整える石。","修理補助",38],
-    ["石皿","冷たく硬い、食事にも飾りにも使える皿。","食事用、装飾",30],
-    ["石椅子","ずっしりとして動かない、据え置きの椅子。","休憩、固定",48],
-    ["石壁材","厚みがあり、外からの圧をしっかり受け止める。","建築、防壁",60],
-    ["石像片","欠けてもなお存在感のある、彫刻の一部。","装飾、高価",75],
-    ["高級石印","緻密な彫りが入った、契約向きの格式ある印。","権威、契約",95]
-  ],
-  "金属系": [
-    ["鉄片","冷たい光を返す、精錬直後の基礎金属。","基礎金属",30],
-    ["鉄釘","細く鋭く、打ち込むたびに軽く鳴る釘。","建築補助",22],
-    ["鉄板","鈍い輝きのある、重厚な金属板。","耐久、建材",45],
-    ["鉄包丁","刃先が冷たく光る、切れ味のいい金属刃。","切る、調理",50],
-    ["鉄鎖","金属音がはっきり響く、重い連結鎖。","拘束、防犯",55],
-    ["鉄車軸","摩擦を抑えるため、丁寧に磨かれた回転軸。","車両部品",60],
-    ["鉄箱金具","箱の角をきゅっと締める、実用的な留め具。","箱強化",42],
-    ["鉄盾","金属の重さがそのまま守りになる堅牢な盾。","防御高",70],
-    ["機械芯材","端子や配線の受け皿になる、機械の中心部。","電化基礎",85],
-    ["高級金属章","磨き上げられた表面に意匠が沈む、格式ある章。","権威、希少",120]
-  ],
-  "布系": [
-    ["糸束","指先でほどけそうな、細く撚られた繊維の束。","裁縫基礎",18],
-    ["布切れ","余った布ではあるが、修繕には十分使える。","修繕、包み",20],
-    ["包帯","清潔でやわらかく、傷に巻くと安心感がある。","回復補助",28],
-    ["肩掛け袋","しっかりした紐付きで、歩きながら使いやすい。","収納+5",30],
-    ["帽子","ふっと影を落とし、頭を守る軽やかな布製品。","防寒、見た目",24],
-    ["布旗","風を受けるたび、所属を静かに主張する布。","表示、所属",35],
-    ["丈夫な紐","しなやかだが、引っ張ると頼りがいがある。","結束、固定",26],
-    ["布靴ひも","ほどけにくいよう、細く丁寧に編まれたひも。","靴補助",18],
-    ["高級反物","光を受けると艶がにじむ、上質な布地。","高級服素材",90],
-    ["礼服地","密度が高く、手触りだけで格が伝わる布。","高級衣類",110]
-  ],
-  "食材系": [
-    ["生野菜","収穫の匂いがそのまま残る、新鮮な葉物。","空腹回復小",12],
-    ["焼き芋","甘い湯気がふわりと立つ、ほくほくの芋。","空腹回復中",18],
-    ["乾パン","乾いた音がするほど保存性の高い食べ物。","保存食",22],
-    ["漬物","塩気と香りがきゅっと凝縮した、長持ちする一品。","保存、満腹小",20],
-    ["甘味団子","もちっとした弾力と、やさしい甘さが残る。","気分上昇",25],
-    ["肉串","焼き目が香ばしく、見ただけで腹が鳴る。","空腹回復中",30],
-    ["魚切り身","きれいにさばかれ、調理しやすい切り身。","回復、調理用",28],
-    ["スープ素材","野菜と水の香りが混ざる、温かい下ごしらえ。","回復補助",26],
-    ["保存食","塩と乾燥で守られた、旅向きの頼れる食料。","長期保存",35],
-    ["高級弁当","彩りまで整えられた、見ても食べても満足な弁当。","大回復、満腹",70]
-  ],
-  "飲料系": [
-    ["水筒水","ひんやりと落ち着く、持ち歩きやすい水。","のど回復",10],
-    ["薄茶","すっきりした香りが立つ、軽いお茶。","眠気軽減",15],
-    ["果汁","果物の甘さがぎゅっと詰まった、明るい飲み物。","回復小",20],
-    ["炭酸水","口の中でぱちぱち弾ける、気分転換の水。","気分上昇",18],
-    ["回復茶","薬草の香りが静かに広がる、落ち着いた茶。","回復中",28],
-    ["栄養乳","まろやかで腹持ちがいい、栄養重視の乳飲料。","空腹補助",32],
-    ["眠気飛びコーヒー","苦味がしっかり立つ、意識を引き締める飲み物。","集中上昇",30],
-    ["発泡酒","軽い苦味と泡が残る、気分をゆるめる一杯。","気分高揚",25],
-    ["薬湯","草の香りが熱とともに立ちのぼる、回復用の湯。","回復大",35],
-    ["高級果実酒","深い香りと甘さが混ざる、贅沢な嗜好品。","高級嗜好品",80]
-  ],
-  "調理器具系": [
-    ["まな板","何度も使われた跡がある、実直な調理台の一部。","調理基礎",20],
-    ["包丁","先端が鋭く、食材をすっと切り分ける刃。","さばく、切る",45],
-    ["鍋","黒ずんだ底が頼もしい、加熱向きの鍋。","加熱調理",50],
-    ["フライパン","焼き目がきれいにつく、扱いやすい平鍋。","焼く",48],
-    ["串焼き台","火の前でじっくり焼くための、素朴な台。","焼き料理",60],
-    ["蒸し器","湯気をため込み、やわらかく仕上げる器具。","蒸す",65],
-    ["急須","湯を静かに落とす、小ぶりで上品な器。","飲料調理",42],
-    ["トング","先端がきれいに揃い、つかみやすい金具。","つかむ",38],
-    ["料理台","下ごしらえから盛り付けまで支える作業台。","調理効率上昇",70],
-    ["高級調理台","触るとひんやりし、作業の気分まで整う台。","高速調理",120]
-  ],
-  "衣類系": [
-    ["粗布服","ざらりとした手触りの、最低限の服。","基本防寒",22],
-    ["作業着","汚れに強く、働く人の匂いがする服。","労働効率小上昇",35],
-    ["外套","風を受け止める、少し大きめの上着。","防寒、外出向き",45],
-    ["雨合羽","水滴を弾いて光る、防水寄りの衣服。","雨耐性",50],
-    ["礼服","生地の揃い方からして整っている、きちんとした服。","交渉、見た目",90],
-    ["防寒服","触ると厚く、冬の空気を押し返すような服。","寒さ軽減",70],
-    ["旅人服","軽くて動きやすい、歩くための服。","移動向き",55],
-    ["社長服","縫い目まで上品で、着るだけで立場が伝わる。","権威、印象上昇",120],
-    ["高級ドレス","布の流れが美しく、視線を集める華やかな服。","高級感、売上補正",160],
-    ["機能服","軽さと耐久を両立した、実用最優先の服。","全体補助",140]
-  ],
-  "靴系": [
-    ["草鞋","足裏に自然に馴染む、素朴で軽い履物。","軽い移動",18],
-    ["作業靴","地面をしっかり踏める、丈夫な作業用。","労働向き",30],
-    ["革靴","きっちりと形が整い、交渉の場に似合う。","交渉、見た目",45],
-    ["長靴","泥や水を気にせず歩ける、頼れる靴。","水に強い",50],
-    ["軽量靴","見た目よりずっと軽く、足運びが速い。","速さ上昇",42],
-    ["防寒靴","内側にぬくもりが残る、冬向きの靴。","寒さ軽減",55],
-    ["運動靴","弾みがあり、走ることに向いた靴。","走行向き",48],
-    ["高級靴","つま先まできれいに揃った、上等な一足。","高級感",95],
-    ["滑り止め靴","底の溝が深く、足元を安定させる。","転倒軽減",60],
-    ["乗馬靴","すっと伸びる形が美しい、移動者向けの靴。","車両・乗り物向き",70]
-  ],
-  "家具系": [
-    ["簡易椅子","少し軋むが、座ればひとまず落ち着ける。","休憩",20],
-    ["木机","木目が素直に見える、作業しやすい机。","作業効率小上昇",40],
-    ["棚","物を並べるだけで整って見える、実用的な棚。","収納増加",45],
-    ["寝台","横になると少し安心する、休むための台。","回復効率",55],
-    ["食卓","食事の時間をきちんと見せる、家の中心。","食事用",50],
-    ["箱椅子","座れて収納もできる、気の利いた箱。","収納兼用",38],
-    ["高級椅子","布の張りと木の艶が目を引く、上質な椅子。","見た目、快適",90],
-    ["書斎机","経営や学習の空気を作る、落ち着いた机。","学習、経営補助",100],
-    ["大きな棚","壁際をしっかり埋める、頼もしい収納棚。","大収納",110],
-    ["応接ソファ","ふわりと沈む、交渉の場を整えるソファ。","交渉、快適",150]
-  ],
-  "建材系": [
-    ["土ブロック","まだ素朴なままの、積みやすい土の塊。","基礎建材",10],
-    ["木壁","木の香りが残る、あたたかい壁材。","住宅壁",35],
-    ["石壁","冷たく重く、外敵を寄せつけにくい壁。","防御建材",55],
-    ["屋根材","雨粒を受け止める、軽やかな屋根の素材。","雨防止",40],
-    ["柱材","上からの圧をまっすぐ受け止める、重要な部材。","支持力増加",45],
-    ["床材","足音が落ち着いて響く、歩きやすい床。","歩きやすい",38],
-    ["窓枠","光をうまく切り取り、風景を額縁にする枠。","視認性",30],
-    ["ドア枠","出入りのたびに空気が変わる、境界の枠。","出入口",42],
-    ["強化壁材","石壁に金属の気配を足した、堅牢な防壁。","耐久高",90],
-    ["高級外装材","表面の仕上げだけで格が伝わる、上等な外壁。","高級建築",140],
-    ["家土地マット","真っ白に輝く、住宅区画専用の土地マット。設置すると家の目印になる。","住宅地表示(白)",20],
-    ["会社土地マット","重厚な灰色の、会社・商業区画専用の土地マット。50個集めると会社が設立できる。","商業地表示(灰)",30],
-    ["農地マット","濃い茶色の、農地専用の土地マット。敷くと畑として使える。","農地表示(茶)",15],
-    ["高級農地マット","金色の筋が入った、種を植えるために必要な特別な農地マット。","種植え許可",300]
-  ],
-  "農業系": [
-    ["種袋","小さな粒がカサカサ鳴る、播種用の袋。","播種",15],
-    ["水桶","たっぷり水を運べる、農家の必需品。","灌漑",25],
-    ["肥料","土に力を戻す、少し匂うが頼れる資材。","成長促進",30],
-    ["クワ","土を返すたびにリズムが生まれる、耕作道具。","耕作",40],
-    ["スコップ","土をすくい、形を整えるための基本工具。","掘る",42],
-    ["収穫籠","取れた実を優しく受け止める、編み籠。","回収効率",35],
-    ["支柱","作物をまっすぐ育てる、細いけれど大切な棒。","作物支え",28],
-    ["水路材","水の流れを整える、畑の血管のような部材。","水回し",50],
-    ["温室材","光を通して熱をためる、育成に向いた素材。","生育補助",120],
-    ["高級畑札","立てるだけで畑が格上げされる、特別な札。","畑の価値上昇",80]
-  ],
-  "工具系": [
-    ["小槌","ちいさな打撃音が気持ちいい、手軽な槌。","打つ",20],
-    ["ノコギリ","刃が細かく並び、木を少しずつ切っていく。","切断",45],
-    ["ドライバー","先端がぴたりと合う、組み立て向きの道具。","組立",35],
-    ["ペンチ","握るとしっかり力が伝わる、つかみ道具。","つかむ",40],
-    ["レンチ","ひねる動作に特化した、締めるための道具。","締める",38],
-    ["釘抜き","こじるときの手応えが気持ちいい、修理向き道具。","修理",30],
-    ["測定器","目盛りが整っていて、正確さを与えてくれる。","計測",60],
-    ["研磨具","表面を少しずつ整え、滑らかにする道具。","研ぐ",42],
-    ["修理箱","必要な小物がまとまった、頼れる一式。","修理一式",75],
-    ["高級工具箱","金具の輝きが違う、性能も見た目も上位。","高性能",130]
-  ],
-  "電化系": [
-    ["電池","小さいのにしぶとく働く、電力の元。","電力供給",25],
-    ["ランプ","暗がりに小さな輪を作る、安定した光源。","照明",35],
-    ["配線","見た目は地味だが、機械同士をつなぐ要。","接続",30],
-    ["スイッチ","カチッと軽い音が気持ちいい、切替器。","ON/OFF",28],
-    ["扇風機","羽根が涼しい風をつくる、生活感のある電化品。","涼しさ",65],
-    ["充電器","足りない電気を静かに戻す、補給装置。","充電",60],
-    ["ラジオ","小さな音が空間を埋める、情報の受信機。","情報取得",70],
-    ["掃除機","空気を吸い込む音が強く、清掃の存在感がある。","清掃",85],
-    ["モニタ","画面がぱっと開き、世界を映し出す。","表示",90],
-    ["高級端末","触れるだけで反応が違う、多機能な上位機器。","多機能",160]
-  ],
-  "車両系": [
-    ["車輪","まっすぐ転がる、移動の原点みたいな輪。","移動基礎",35],
-    ["軸","回転を逃さない、まっすぐな芯。","回転補助",30],
-    ["ハンドル","握る角度で進み方が変わる、操舵の要。","操舵",40],
-    ["座席","長く座っても疲れにくい、乗るための場所。","乗車快適",45],
-    ["荷台","荷物を積むと頼もしさが増す、運搬の土台。","物運び",60],
-    ["エンジン","低くうなるような力を生む、推進の心臓。","推進力",120],
-    ["タイヤ","路面をしっかりつかむ、走りの要。","路面対応",80],
-    ["窓","外の景色が見え、運転の不安を減らす。","視界",50],
-    ["小型車","軽快に走り、街の中を素早く抜ける。","移動高速化",250],
-    ["高級車体","走るだけで目を引く、上質な外装と構造。","高速・高級",500]
-  ],
-  "医療系": [
-    ["湿布","ひんやりしていて、貼ると痛みが和らぐ。","痛み軽減",20],
-    ["包帯","清潔でやわらかく、傷に巻くと安心する。","回復補助",25],
-    ["消毒液","かすかな刺激のある、衛生を守る液体。","感染防止",30],
-    ["痛み止め","つらさを少し遠ざける、頼れる小瓶。","即時回復小",40],
-    ["注射器","細く鋭い、薬を正確に届ける道具。","投与",55],
-    ["救急箱","必要なものがひとまとめになった、安心の箱。","回復一式",80],
-    ["マスク","口元を静かに覆う、衛生意識のある布。","衛生",18],
-    ["体温計","健康状態を数字で見せる、細い計測器。","健康確認",45],
-    ["治療具","触れると手当の気配がある、本格的な器具。","回復大",100],
-    ["高級診療箱","ふたを開けるだけで整って見える、上位医療箱。","高回復",170]
-  ],
-  "会社系": [
-    ["名刺","小さいのに存在感がある、自己紹介の札。","交渉補助",10],
-    ["印章","押すと責任が生まれる、契約の印。","契約用",25],
-    ["書類束","きちんと揃えられた、業務のまとまり。","業務資料",20],
-    ["掲示板紙","情報を書いて貼るだけで、空間が動き出す。","告知",15],
-    ["会計帳","数字が並び、会社の空気を引き締める。","会計管理",35],
-    ["社員証","首から下げるだけで所属が伝わる。","入退社管理",30],
-    ["契約書","行間まで重みがある、会社の約束事。","法的効力",40],
-    ["ロッカー鍵","小さいが、個人の持ち場を守る鍵。","収納管理",28],
-    ["社長机","座るだけで視界が広くなる、経営の机。","経営補助",120],
-    ["高級社章","金属と宝石の気配が混ざる、誇りの象徴。","権威",180]
-  ],
-  "法務・警察系": [
-    ["通報札","見るだけで何かあったと伝わる、簡潔な札。","通報可視化",12],
-    ["手錠","金属の冷たさがはっきり伝わる拘束具。","拘束",50],
-    ["証拠袋","中身を守るため、封がしっかり閉じる袋。","証拠保存",30],
-    ["張り紙","壁に貼ると空気が変わる、目立つ告知紙。","指名手配表示",18],
-    ["捜査メモ","手早く要点が残せる、記録用の紙束。","記録",20],
-    ["拘束帯","布と金具が組み合わさった、制圧向きの帯。","制圧",45],
-    ["巡回札","警備の動きを示す、視認性の高い札。","警備認識",35],
-    ["警棒","片手で扱いやすい、護身向きの棒。","護身",60],
-    ["掲示板札","告知をまとめて見せる、掲示向きの札。","告知",15],
-    ["高級令状","厚みがあり、持つだけで重みを感じる紙。","強制力",130]
-  ],
-  "生活雑貨系": [
-    ["皿","つるりとした面が、食事をきれいに見せる。","食事用",15],
-    ["箸","軽くて細く、手になじむ食卓の道具。","食事用",12],
-    ["コップ","透明感があり、飲み物が映える器。","飲用",18],
-    ["タオル","吸う力があり、触れると安心する布。","清潔",20],
-    ["櫛","髪を整えるたび、身だしなみが締まる。","身だしなみ",14],
-    ["鏡","自分の顔を静かに返す、日常の相棒。","見た目確認",35],
-    ["傘","開くと空気の形が変わる、雨の日の味方。","雨対策",40],
-    ["袋","何でもひとまず受け止める、素朴な運搬具。","持ち運び",18],
-    ["掃除道具","端を使うたび、空間が少しずつ整う。","清掃",30],
-    ["高級日用品箱","まとめて並べるだけで生活が上品に見える。","収納、装飾",100]
-  ],
-  "装飾・高級品系": [
-    ["花飾り","近づくとふわっと香る、やわらかな飾り。","装飾",20],
-    ["金箔紙","角度で光が流れる、派手すぎない贅沢。","高級表示",35],
-    ["香袋","袖口に残るくらい、やさしい香りの袋。","香り、印象",28],
-    ["宝石片","小さいのに光だけは強い、価値の塊。","高級素材",80],
-    ["装飾灯","点けると部屋の雰囲気が一段上がる。","雰囲気上昇",70],
-    ["高級ボタン","服の印象を静かに変える、小さな主役。","服飾用",32],
-    ["彫刻札","表面の線が美しい、記念向きの札。","記念品",45],
-    ["金縁鏡","枠の豪華さで、映る景色まで上品に見える。","高級感",120],
-    ["宝箱","開ける前から特別感がある、豪華な収納。","収納、高級",150],
-    ["王冠","持つだけで場の空気が変わる、象徴的な品。","権威、象徴",300]
-  ]
+"木材系":[
+["丸棒","削りたての木の香りが残る、手に馴染む細い棒。","軽量、汎用","木材 + 乾燥",1200,true],
+["板材","木目がまっすぐ通った、扱いやすい平たい木材。","建築、加工基礎","木材 + 圧縮",1500,true],
+["木箱","釘跡は少し荒いが、素朴で頼れる収納箱。","収納+10","板材 + 釘",2200,true],
+["木槌","叩くたびに乾いた音が響く、素直な木の槌。","叩く、修理","丸棒 + 木芯",2000,true],
+["柄棒","表面がなめらかに磨かれた、握りやすい棒。","つかむ、振る","丸棒 + 研磨",1000,true],
+["木車輪","軽く回るが、どこか温もりのある木製の輪。","移動補助","板材 + 丸棒",2400,true],
+["木椅子","座るとわずかに軋む、安心感のある木の椅子。","休憩、回復","板材 + 接合",2600,true],
+["木盾","木目の上に補強が走る、素朴で堅い盾。","防御上昇","板材 + 強化材",3000,true],
+["梁材","太く長く、家の骨組みを支える頼もしさがある。","建築強化","長木材 + 固定材",3400,true],
+["高級木札","漆の艶が静かに光る、刻印入りの上質な札。","装飾、贈答","木材 + 彫刻 + 漆",5000,true]
+],
+"石材系":[
+["石ころ包み","布に包まれた、重くて投げやすい石の束。","投擲、重み","石 + 布",1000,true],
+["石板","表面が平らで、文字や掲示に向く石の板。","建材、掲示","石 + 削り",1400,true],
+["石杭","先端が尖り、地面に刺さりやすい石の杭。","設置、牽制","石 + 尖端加工",1600,true],
+["石槌","重みがそのまま力になる、素朴で無骨な槌。","叩く、耐久高","石 + 木柄",1800,true],
+["砥石","指でなぞるとざらりと返る、刃を整える石。","修理補助","石 + 研磨",2200,true],
+["石皿","冷たく硬い、食事にも飾りにも使える皿。","食事用、装飾","石 + 整形",2000,true],
+["石椅子","ずっしりとして動かない、据え置きの椅子。","休憩、固定","石 + 接合",2800,true],
+["石壁材","厚みがあり、外からの圧をしっかり受け止める。","建築、防壁","石 + 成形",3600,true],
+["石像片","欠けてもなお存在感のある、彫刻の一部。","装飾、高価","石 + 彫刻",4800,true],
+["高級石印","緻密な彫りが入った、契約向きの格式ある印。","権威、契約","石 + 彫刻 + 金粉",6000,true]
+],
+"金属系":[
+["鉄片","冷たい光を返す、精錬直後の基礎金属。","基礎金属","鉄鉱石 + 精錬",1300,true],
+["鉄釘","細く鋭く、打ち込むたびに軽く鳴る釘。","建築補助","鉄片 + 打ち伸ばし",1100,true],
+["鉄板","鈍い輝きのある、重厚な金属板。","耐久、建材","鉄片 + 圧延",2400,true],
+["鉄包丁","刃先が冷たく光る、切れ味のいい金属刃。","切る、調理","鉄片 + 刃付け",2600,true],
+["鉄鎖","金属音がはっきり響く、重い連結鎖。","拘束、防犯","鉄片 + 連結",2800,true],
+["鉄車軸","摩擦を抑えるため、丁寧に磨かれた回転軸。","車両部品","鉄片 + 研磨",3200,true],
+["鉄箱金具","箱の角をきゅっと締める、実用的な留め具。","箱強化","鉄片 + 曲げ加工",2200,true],
+["鉄盾","金属の重さがそのまま守りになる堅牢な盾。","防御高","鉄板 + 柄",3600,true],
+["機械芯材","端子や配線の受け皿になる、機械の中心部。","電化基礎","鉄片 + 配線",5200,true],
+["高級金属章","磨き上げられた表面に意匠が沈む、格式ある章。","権威、希少","金属 + 複合仕上げ",8000,true]
+],
+"布系":[
+["糸束","指先でほどけそうな、細く撚られた繊維の束。","裁縫基礎","繊維 + 撚り",1000,true],
+["布切れ","余った布ではあるが、修繕には十分使える。","修繕、包み","糸束 + 織り",1200,true],
+["包帯","清潔でやわらかく、傷に巻くと安心感がある。","回復補助","布切れ + 清潔処理",1800,true],
+["肩掛け袋","しっかりした紐付きで、歩きながら使いやすい。","収納+5","布 + 紐",2200,true],
+["帽子","ふっと影を落とし、頭を守る軽やかな布製品。","防寒、見た目","布 + 型取り",1600,true],
+["布旗","風を受けるたび、所属を静かに主張する布。","表示、所属","布 + 染色",2600,true],
+["丈夫な紐","しなやかだが、引っ張ると頼りがいがある。","結束、固定","糸束 + 強化",1400,true],
+["布靴ひも","ほどけにくいよう、細く丁寧に編まれたひも。","靴補助","糸束 + 伸縮",1000,true],
+["高級反物","光を受けると艶がにじむ、上質な布地。","高級服素材","布 + 染色 + 光沢",5400,true],
+["礼服地","密度が高く、手触りだけで格が伝わる布。","高級衣類","高密度布 + 漆仕上げ",7000,true]
+],
+"食材系":[
+["生野菜","収穫の匂いがそのまま残る、新鮮な葉物。","空腹回復小","畑作物 + 収穫",800,true],
+["焼き芋","甘い湯気がふわりと立つ、ほくほくの芋。","空腹回復中","芋 + 加熱",1200,true],
+["乾パン","乾いた音がするほど保存性の高い食べ物。","保存食","小麦 + 乾燥",1500,true],
+["漬物","塩気と香りがきゅっと凝縮した、長持ちする一品。","保存、満腹小","野菜 + 塩漬け",1300,true],
+["甘味団子","もちっとした弾力と、やさしい甘さが残る。","気分上昇","米粉 + 甘味",1800,true],
+["肉串","焼き目が香ばしく、見ただけで腹が鳴る。","空腹回復中","肉 + 焼き",2200,true],
+["魚切り身","きれいにさばかれ、調理しやすい切り身。","回復、調理用","魚 + さばき",2000,true],
+["スープ素材","野菜と水の香りが混ざる、温かい下ごしらえ。","回復補助","野菜 + 水",1700,true],
+["保存食","塩と乾燥で守られた、旅向きの頼れる食料。","長期保存","肉 + 塩 + 乾燥",2600,true],
+["高級弁当","彩りまで整えられた、見ても食べても満足な弁当。","大回復、満腹","複数食材 + 盛り付け",6000,true]
+],
+"飲料系":[
+["水筒水","ひんやりと落ち着く、持ち歩きやすい水。","のど回復","水 + 詰める",500,true],
+["薄茶","すっきりした香りが立つ、軽いお茶。","眠気軽減","茶葉 + 湯",1000,true],
+["果汁","果物の甘さがぎゅっと詰まった、明るい飲み物。","回復小","果物 + 搾り",1400,true],
+["炭酸水","口の中でぱちぱち弾ける、気分転換の水。","気分上昇","水 + 気泡",1200,true],
+["回復茶","薬草の香りが静かに広がる、落ち着いた茶。","回復中","茶葉 + 薬草",2200,true],
+["栄養乳","まろやかで腹持ちがいい、栄養重視の乳飲料。","空腹補助","乳 + 加工",2400,true],
+["眠気飛びコーヒー","苦味がしっかり立つ、意識を引き締める飲み物。","集中上昇","豆 + 焙煎",2600,true],
+["発泡酒","軽い苦味と泡が残る、気分をゆるめる一杯。","気分高揚","穀物 + 発酵",1800,true],
+["薬湯","草の香りが熱とともに立ちのぼる、回復用の湯。","回復大","草 + 煮出し",3000,true],
+["高級果実酒","深い香りと甘さが混ざる、贅沢な嗜好品。","高級嗜好品","果物 + 熟成",7000,true]
+],
+"調理器具系":[
+["まな板","何度も使われた跡がある、実直な調理台の一部。","調理基礎","木板 + 整形",1000,true],
+["包丁","先端が鋭く、食材をすっと切り分ける刃。","さばく、切る","鉄片 + 柄",2600,true],
+["鍋","黒ずんだ底が頼もしい、加熱向きの鍋。","加熱調理","金属板 + 成形",3000,true],
+["フライパン","焼き目がきれいにつく、扱いやすい平鍋。","焼く","金属板 + 柄",2800,true],
+["串焼き台","火の前でじっくり焼くための、素朴な台。","焼き料理","金具 + 枠",3600,true],
+["蒸し器","湯気をため込み、やわらかく仕上げる器具。","蒸す","金属枠 + 蓋",4000,true],
+["急須","湯を静かに落とす、小ぶりで上品な器。","飲料調理","陶片 + 取手",2200,true],
+["トング","先端がきれいに揃い、つかみやすい金具。","つかむ","金具 + バネ",1800,true],
+["料理台","下ごしらえから盛り付けまで支える作業台。","調理効率上昇","板材 + 金具",5000,true],
+["高級調理台","触るとひんやりし、作業の気分まで整う台。","高速調理","複合素材 + 研磨",9000,true]
+],
+"衣類系":[
+["粗布服","ざらりとした手触りの、最低限の服。","基本防寒","布切れ + 縫製",1200,true],
+["作業着","汚れに強く、働く人の匂いがする服。","労働効率小上昇","布 + 補強",1800,true],
+["外套","風を受け止める、少し大きめの上着。","防寒、外出向き","厚布 + 裏地",2400,true],
+["雨合羽","水滴を弾いて光る、防水寄りの衣服。","雨耐性","防水布 + 縫製",2600,true],
+["礼服","生地の揃い方からして整っている、きちんとした服。","交渉、見た目","高級反物 + 装飾",6000,true],
+["防寒服","触ると厚く、冬の空気を押し返すような服。","寒さ軽減","厚布 + 綿入り",3800,true],
+["旅人服","軽くて動きやすい、歩くための服。","移動向き","軽布 + 多ポケット",2800,true],
+["社長服","縫い目まで上品で、着るだけで立場が伝わる。","権威、印象上昇","高級反物 + 章",8000,true],
+["高級ドレス","布の流れが美しく、視線を集める華やかな服。","高級感、売上補正","礼服地 + 装飾",12000,true],
+["機能服","軽さと耐久を両立した、実用最優先の服。","全体補助","特殊布 + 複合繊維",10000,true]
+],
+"靴系":[
+["草鞋","足裏に自然に馴染む、素朴で軽い履物。","軽い移動","草繊維 + 編み",800,true],
+["作業靴","地面をしっかり踏める、丈夫な作業用。","労働向き","布 + 補強底",1600,true],
+["革靴","きっちりと形が整い、交渉の場に似合う。","交渉、見た目","皮 + 底材",2400,true],
+["長靴","泥や水を気にせず歩ける、頼れる靴。","水に強い","防水材 + 底材",2600,true],
+["軽量靴","見た目よりずっと軽く、足運びが速い。","速さ上昇","軽布 + 薄底",2200,true],
+["防寒靴","内側にぬくもりが残る、冬向きの靴。","寒さ軽減","厚布 + 裏地",3000,true],
+["運動靴","弾みがあり、走ることに向いた靴。","走行向き","弾性材 + 底材",2600,true],
+["高級靴","つま先まできれいに揃った、上等な一足。","高級感","皮 + 装飾金具",6000,true],
+["滑り止め靴","底の溝が深く、足元を安定させる。","転倒軽減","特殊底材 + 突起",3400,true],
+["乗馬靴","すっと伸びる形が美しい、移動者向けの靴。","車両・乗り物向き","丈夫革 + 専用底",4200,true]
+],
+"家具系":[
+["簡易椅子","少し軋むが、座ればひとまず落ち着ける。","休憩","木材 + 接合",1000,true],
+["木机","木目が素直に見える、作業しやすい机。","作業効率小上昇","板材 + 脚材",2200,true],
+["棚","物を並べるだけで整って見える、実用的な棚。","収納増加","板材 + 釘",2600,true],
+["寝台","横になると少し安心する、休むための台。","回復効率","木材 + 布",3200,true],
+["食卓","食事の時間をきちんと見せる、家の中心。","食事用","板材 + 補強",3000,true],
+["箱椅子","座れて収納もできる、気の利いた箱。","収納兼用","木箱 + 布",1800,true],
+["高級椅子","布の張りと木の艶が目を引く、上質な椅子。","見た目、快適","木材 + 布 + 彫刻",6000,true],
+["書斎机","経営や学習の空気を作る、落ち着いた机。","学習、経営補助","木材 + 金具",8000,true],
+["大きな棚","壁際をしっかり埋める、頼もしい収納棚。","大収納","板材 + 梁材",9000,true],
+["応接ソファ","ふわりと沈む、交渉の場を整えるソファ。","交渉、快適","厚布 + 木枠",12000,true]
+],
+"建材系":[
+["土ブロック","まだ素朴なままの、積みやすい土の塊。","基礎建材","土 + 圧縮",500,true],
+["木壁","木の香りが残る、あたたかい壁材。","住宅壁","板材 + 梁材",1800,true],
+["石壁","冷たく重く、外敵を寄せつけにくい壁。","防御建材","石板 + 接合",2800,true],
+["屋根材","雨粒を受け止める、軽やかな屋根の素材。","雨防止","板材 + 防水処理",2200,true],
+["柱材","上からの圧をまっすぐ受け止める、重要な部材。","支持力増加","木材 + 強化",2400,true],
+["床材","足音が落ち着いて響く、歩きやすい床。","歩きやすい","板材 + 研磨",2000,true],
+["窓枠","光をうまく切り取り、風景を額縁にする枠。","視認性","木材 + 金具",1600,true],
+["ドア枠","出入りのたびに空気が変わる、境界の枠。","出入口","木材 + 金具",1800,true],
+["強化壁材","石壁に金属の気配を足した、堅牢な防壁。","耐久高","石壁 + 金属補強",5000,true],
+["高級外装材","表面の仕上げだけで格が伝わる、上等な外壁。","高級建築","複合素材 + 仕上げ",9000,true],
+["家土地マット","真っ白に輝く、住宅区画専用の土地マット。設置すると家の目印になる。","住宅地表示(白)","不動産で取得",20,false],
+["会社土地マット","重厚な灰色の、会社・商業区画専用の土地マット。50個集めると会社が設立できる。","商業地表示(灰)","不動産で取得",30,false],
+["農地マット","濃い茶色の、農地専用の土地マット。敷くと畑として使える。","農地表示(茶)","不動産で取得",15,false],
+["高級農地マット","金色の筋が入った、種を植えるために必要な特別な農地マット。","種植え許可","不動産で購入",300,true]
+],
+"農業系":[
+["種袋","小さな粒がカサカサ鳴る、播種用の袋。","播種","布 + 種子",800,true],
+["水桶","たっぷり水を運べる、農家の必需品。","灌漑","木材 + 防水",1600,true],
+["肥料","土に力を戻す、少し匂うが頼れる資材。","成長促進","有機物 + 乾燥",1800,true],
+["クワ","土を返すたびにリズムが生まれる、耕作道具。","耕作","木柄 + 金具",2400,true],
+["スコップ","土をすくい、形を整えるための基本工具。","掘る","金具 + 柄",2600,true],
+["収穫籠","取れた実を優しく受け止める、編み籠。","回収効率","編み布 + 板材",2000,true],
+["支柱","作物をまっすぐ育てる、細いけれど大切な棒。","作物支え","木材 + 固定",1400,true],
+["水路材","水の流れを整える、畑の血管のような部材。","水回し","石材 + 成形",3000,true],
+["温室材","光を通して熱をためる、育成に向いた素材。","生育補助","ガラス風素材 + 枠",8000,true],
+["高級畑札","立てるだけで畑が格上げされる、特別な札。","畑の価値上昇","木札 + 金箔",5000,true]
+],
+"工具系":[
+["小槌","ちいさな打撃音が気持ちいい、手軽な槌。","打つ","木柄 + 石頭",1000,true],
+["ノコギリ","刃が細かく並び、木を少しずつ切っていく。","切断","金属刃 + 柄",2200,true],
+["ドライバー","先端がぴたりと合う、組み立て向きの道具。","組立","金属棒 + 先端加工",1800,true],
+["ペンチ","握るとしっかり力が伝わる、つかみ道具。","つかむ","金具 + 握り部",2000,true],
+["レンチ","ひねる動作に特化した、締めるための道具。","締める","金属棒 + 曲げ加工",2000,true],
+["釘抜き","こじるときの手応えが気持ちいい、修理向き道具。","修理","鉄片 + 曲げ",1600,true],
+["測定器","目盛りが整っていて、正確さを与えてくれる。","計測","金属 + 目盛り",4000,true],
+["研磨具","表面を少しずつ整え、滑らかにする道具。","研ぐ","石 + 布",2400,true],
+["修理箱","必要な小物がまとまった、頼れる一式。","修理一式","工具束 + 箱",6000,true],
+["高級工具箱","金具の輝きが違う、性能も見た目も上位。","高性能","金属箱 + 完全工具",10000,true]
+],
+"電化系":[
+["電池","小さいのにしぶとく働く、電力の元。","電力供給","金属 + 化学材",1200,true],
+["ランプ","暗がりに小さな輪を作る、安定した光源。","照明","電池 + 光源",1800,true],
+["配線","見た目は地味だが、機械同士をつなぐ要。","接続","金属線 + 被覆",1600,true],
+["スイッチ","カチッと軽い音が気持ちいい、切替器。","ON/OFF","金具 + 端子",1400,true],
+["扇風機","羽根が涼しい風をつくる、生活感のある電化品。","涼しさ","モータ + 羽根",3200,true],
+["充電器","足りない電気を静かに戻す、補給装置。","充電","配線 + 端子",3000,true],
+["ラジオ","小さな音が空間を埋める、情報の受信機。","情報取得","受信機 + 回路",3600,true],
+["掃除機","空気を吸い込む音が強く、清掃の存在感がある。","清掃","モータ + 吸引部",5000,true],
+["モニタ","画面がぱっと開き、世界を映し出す。","表示","画面材 + 回路",7000,true],
+["高級端末","触れるだけで反応が違う、多機能な上位機器。","多機能","回路 + 強化外装",15000,true]
+],
+"車両系":[
+["車輪","まっすぐ転がる、移動の原点みたいな輪。","移動基礎","木材 + 鉄輪",2200,true],
+["軸","回転を逃さない、まっすぐな芯。","回転補助","鉄片 + 研磨",1800,true],
+["ハンドル","握る角度で進み方が変わる、操舵の要。","操舵","金属 + 柄",2400,true],
+["座席","長く座っても疲れにくい、乗るための場所。","乗車快適","布 + 木枠",2600,true],
+["荷台","荷物を積むと頼もしさが増す、運搬の土台。","物運び","板材 + 補強",3600,true],
+["エンジン","低くうなるような力を生む、推進の心臓。","推進力","金属 + 回路",10000,true],
+["タイヤ","路面をしっかりつかむ、走りの要。","路面対応","ゴム材 + 補強",4000,true],
+["窓","外の景色が見え、運転の不安を減らす。","視界","透明材 + 枠",2000,true],
+["小型車","軽快に走り、街の中を素早く抜ける。","移動高速化","車輪 + エンジン + 座席",18000,true],
+["高級車体","走るだけで目を引く、上質な外装と構造。","高速・高級","エンジン + 高級外装 + 乗車部",40000,true]
+],
+"医療系":[
+["湿布","ひんやりしていて、貼ると痛みが和らぐ。","痛み軽減","布 + 薬草",1200,true],
+["包帯","清潔でやわらかく、傷に巻くと安心する。","回復補助","布 + 清潔処理",1500,true],
+["消毒液","かすかな刺激のある、衛生を守る液体。","感染防止","薬草 + 液体",1800,true],
+["痛み止め","つらさを少し遠ざける、頼れる小瓶。","即時回復小","薬草 + 錠剤",2400,true],
+["注射器","細く鋭い、薬を正確に届ける道具。","投与","金属針 + 管",3000,true],
+["救急箱","必要なものがひとまとめになった、安心の箱。","回復一式","包帯 + 薬 + 箱",6000,true],
+["マスク","口元を静かに覆う、衛生意識のある布。","衛生","布 + 繊維",1000,true],
+["体温計","健康状態を数字で見せる、細い計測器。","健康確認","金属 + 目盛り",2600,true],
+["治療具","触れると手当の気配がある、本格的な器具。","回復大","医療金具 + 薬",10000,true],
+["高級診療箱","ふたを開けるだけで整って見える、上位医療箱。","高回復","救急箱 + 特効薬",20000,true]
+],
+"会社系":[
+["名刺","小さいのに存在感がある、自己紹介の札。","交渉補助","紙 + 印刷",800,true],
+["印章","押すと責任が生まれる、契約の印。","契約用","木札 + 彫刻",1800,true],
+["書類束","きちんと揃えられた、業務のまとまり。","業務資料","紙 + 綴じ",1200,true],
+["掲示板紙","情報を書いて貼るだけで、空間が動き出す。","告知","紙 + 釘穴",1000,true],
+["会計帳","数字が並び、会社の空気を引き締める。","会計管理","紙束 + 製本",2600,true],
+["社員証","首から下げるだけで所属が伝わる。","入退社管理","紙 + 章",2200,true],
+["契約書","行間まで重みがある、会社の約束事。","法的効力","紙 + 印章",3000,true],
+["ロッカー鍵","小さいが、個人の持ち場を守る鍵。","収納管理","金属 + 刻印",1400,true],
+["社長机","座るだけで視界が広くなる、経営の机。","経営補助","木材 + 金具 + 布",15000,true],
+["高級社章","金属と宝石の気配が混ざる、誇りの象徴。","権威","金属 + 宝石片",25000,true]
+],
+"法務・警察系":[
+["通報札","見るだけで何かあったと伝わる、簡潔な札。","通報可視化","紙 + 印刷",1000,true],
+["手錠","金属の冷たさがはっきり伝わる拘束具。","拘束","鉄鎖 + 留め具",3600,true],
+["証拠袋","中身を守るため、封がしっかり閉じる袋。","証拠保存","布袋 + 封印",1800,true],
+["張り紙","壁に貼ると空気が変わる、目立つ告知紙。","指名手配表示","紙 + 糊",1200,true],
+["捜査メモ","手早く要点が残せる、記録用の紙束。","記録","紙 + 筆記",1400,true],
+["拘束帯","布と金具が組み合わさった、制圧向きの帯。","制圧","布 + 金具",2800,true],
+["巡回札","警備の動きを示す、視認性の高い札。","警備認識","金属札 + 印",2000,true],
+["警棒","片手で扱いやすい、護身向きの棒。","護身","木材 + 金属先端",4000,true],
+["掲示板札","告知をまとめて見せる、掲示向きの札。","告知","板材 + 印刷",1000,true],
+["高級令状","厚みがあり、持つだけで重みを感じる紙。","強制力","紙 + 印章 + 金箔",12000,true]
+],
+"生活雑貨系":[
+["皿","つるりとした面が、食事をきれいに見せる。","食事用","陶土 + 焼成",800,true],
+["箸","軽くて細く、手になじむ食卓の道具。","食事用","木材 + 研磨",600,true],
+["コップ","透明感があり、飲み物が映える器。","飲用","透明材 + 成形",1000,true],
+["タオル","吸う力があり、触れると安心する布。","清潔","布 + 織り",1200,true],
+["櫛","髪を整えるたび、身だしなみが締まる。","身だしなみ","木材 + 研磨",700,true],
+["鏡","自分の顔を静かに返す、日常の相棒。","見た目確認","透明材 + 枠",2200,true],
+["傘","開くと空気の形が変わる、雨の日の味方。","雨対策","布 + 骨組み",2600,true],
+["袋","何でもひとまず受け止める、素朴な運搬具。","持ち運び","布 + 縫製",1000,true],
+["掃除道具","端を使うたび、空間が少しずつ整う。","清掃","布 + 柄",1800,true],
+["高級日用品箱","まとめて並べるだけで生活が上品に見える。","収納、装飾","複合雑貨 + 箱",6000,true]
+],
+"装飾・高級品系":[
+["花飾り","近づくとふわっと香る、やわらかな飾り。","装飾","花材 + 紐",1200,true],
+["金箔紙","角度で光が流れる、派手すぎない贅沢。","高級表示","紙 + 金加工",2000,true],
+["香袋","袖口に残るくらい、やさしい香りの袋。","香り、印象","布 + 香料",1800,true],
+["宝石片","小さいのに光だけは強い、価値の塊。","高級素材","石材 + 研磨",8000,true],
+["装飾灯","点けると部屋の雰囲気が一段上がる。","雰囲気上昇","電化 + 装飾",5000,true],
+["高級ボタン","服の印象を静かに変える、小さな主役。","服飾用","金属 + 彫刻",1600,true],
+["彫刻札","表面の線が美しい、記念向きの札。","記念品","木札 + 彫り",2600,true],
+["金縁鏡","枠の豪華さで、映る景色まで上品に見える。","高級感","鏡 + 金縁",12000,true],
+["宝箱","開ける前から特別感がある、豪華な収納。","収納、高級","木箱 + 金具 + 装飾",15000,true],
+["王冠","持つだけで場の空気が変わる、象徴的な品。","権威、象徴","金属 + 宝石 + 装飾",50000,true]
+],
+"種":[
+["小麦の種","小さな粒だが、パン工場の始まりになる。","基本農作物","採取 + 乾燥",400,false],
+["米の種","田にまけば、主食の土台になる。","主食生産","採取 + 精選",500,false],
+["芋の種","土の中で力をためる、腹持ちのいい種。","空腹回復作物","採取 + 乾燥",600,false],
+["野菜の種","料理の幅を広げる、万能な畑の芽。","料理素材","採取 + 選別",450,false],
+["果物の種","育つまで待つぶん、収穫が華やか。","高級食材","果実 + 種取り",800,false],
+["豆の種","保存に強く、煮込み料理に向く。","料理素材","豆 + 選別",550,false],
+["唐辛子の種","小さいが、料理全体の印象を変える。","辛味付与","乾燥唐辛子 + 種取り",700,false],
+["茶葉の種","一杯の茶が町の空気を落ち着かせる。","飲料素材","茶葉 + 分別",900,false],
+["薬草の種","治療の材料になる、薬効寄りの芽。","医療素材","薬草 + 種取り",1000,false],
+["綿花の種","布や包帯の原料になる、繊維系の種。","布素材","綿花 + 採種",750,false],
+["麻の種","丈夫な紐や袋のもとになる。","丈夫な布材","麻 + 採種",650,false],
+["花の種","景色を変える、見た目重視の芽。","装飾","花 + 種取り",850,false],
+["木の実の種","森と畑をつなぐ、素朴な芽。","素材・軽食","木の実 + 選別",700,false],
+["松の種","森林資材の始まりになる、育ちの良い種。","木材素材","松ぼっくり + 種取り",900,false],
+["竹の種","早く伸びて、棒や建材に変わる。","建材素材","竹片 + 選別",800,false],
+["ゴムの種","車や靴に繋がる、工業寄りの資材。","工業素材","ゴム実 + 精選",1200,false],
+["綿実の種","高級布や服飾に繋がる、質のいい種。","高級布素材","綿実 + 種取り",1100,false],
+["香草の種","料理も香りも一段上げる、使い勝手のよい芽。","香りづけ","香草 + 種取り",950,false],
+["きのこ菌床","湿気のある場所で静かに育つ、室内栽培向き。","副食材","菌糸 + 培地",600,false],
+["希少花の種","ゆっくり育つぶん、咲けば大きな価値になる。","高級装飾","希少花 + 種取り",2000,false]
+]
 };
+const SEED_NAMES = ITEM_DB["種"].map(r=>r[0]);
+
 // フラット化 + ID付与 + 現在相場(初期値=売値)
 const ALL_ITEMS = [];
 let _iid = 1;
 for(const cat in ITEM_DB){
-  ITEM_DB[cat].forEach(([name,desc,effect,price])=>{
-    ALL_ITEMS.push({id:_iid++, cat, name, desc, effect, basePrice:price, price, supply:50, demand:50});
+  ITEM_DB[cat].forEach(([name,desc,effect,recipe,price,purchasable])=>{
+    ALL_ITEMS.push({id:_iid++, cat, name, desc, effect, recipe, basePrice:price, price, supply:50, demand:50, purchasable});
   });
 }
 function findItem(name){ return ALL_ITEMS.find(i=>i.name===name); }
 function findItemById(id){ return ALL_ITEMS.find(i=>i.id===id); }
 
 /* ---------------------------------------------------------------------------------
-   1. サウンド(WebAudio、外部ファイル不要 — GitHub Pagesでもそのまま鳴る)
+   1. サウンド(WebAudio)
 --------------------------------------------------------------------------------- */
 const SND = (()=>{
   let ctx=null, master=null;
@@ -665,7 +727,8 @@ const SND = (()=>{
     water:()=>noise(0.3,0.08),
     craft:()=>{ tone(400,0.06,'square',0.15); setTimeout(()=>tone(500,0.06,'square',0.15),80); setTimeout(()=>tone(650,0.08,'square',0.18),160); },
     talk:()=>tone(520,0.05,'sine',0.15,560),
-    door:()=>tone(260,0.18,'triangle',0.2,200)
+    door:()=>tone(260,0.18,'triangle',0.2,200),
+    save:()=>{ tone(660,0.07,'sine',0.18,880); setTimeout(()=>tone(880,0.09,'sine',0.16,1100),70); }
   };
 })();
 
@@ -673,6 +736,7 @@ const SND = (()=>{
    2. プレイヤー状態
 --------------------------------------------------------------------------------- */
 const SKINS_DEFAULT = ["🙂","🧑","👩","🧔","👨‍🌾","🧑‍🌾","🧑‍💼","👮","🥷","🧙","🧑‍🚀","🤠","😺","🐻","🐸","🦊"];
+const SAVE_KEY = "craftWorldJapanSave_v1";
 
 const state = {
   name:"プレイヤー", skin:"🙂", world:1,
@@ -680,8 +744,8 @@ const state = {
   pos:{x:350,z:350}, yaw:0, pitch:0,
   inventory: new Array(10).fill(null), // {itemId, qty}
   selectedSlot:0,
-  status:"ホームレス", // ホームレス/仮住まい/土地所有者/家所有者/会社員/農家/会社社長/指名手配犯/懲役中
-  company:null, // {name, role}
+  status:"ホームレス",
+  company:null,
   ownedLand: [],
   ownedHouse:false,
   crimeValue:0,
@@ -693,8 +757,8 @@ const state = {
   workTickAccum:0,
 };
 
-let companies = []; // {id, name, owner, employees:[{name,wage}], treasury}
-let landPlots = []; // {id, type, x,z, owner, price}
+let companies = [];
+let landPlots = [];
 function genLandPlots(){
   landPlots = [];
   let id=1;
@@ -716,7 +780,6 @@ function genLandPlots(){
 genLandPlots();
 
 function addItem(itemId, qty=1){
-  // 既存スタックに追加
   for(const slot of state.inventory){
     if(slot && slot.itemId===itemId && slot.qty<60){
       const room = 60-slot.qty;
@@ -749,7 +812,7 @@ function countItem(itemId){
 }
 
 /* ---------------------------------------------------------------------------------
-   3. UI: トースト / 通知
+   3. UI: トースト
 --------------------------------------------------------------------------------- */
 function toast(msg){
   const c = document.getElementById('centerMsg');
@@ -760,7 +823,7 @@ function toast(msg){
 }
 
 /* ---------------------------------------------------------------------------------
-   4. インベントリUI(ドラッグ&ドロップ対応)
+   4. インベントリUI
 --------------------------------------------------------------------------------- */
 function renderInventory(){
   const bar = document.getElementById('invBar');
@@ -773,7 +836,7 @@ function renderInventory(){
     if(slot){
       const it = findItemById(slot.itemId);
       el.innerHTML = `<span>${slotIcon(it.cat)}</span><span class="qty">${slot.qty}</span><span class="slotNum">${i+1}</span>`;
-      el.title = `${it.name}\n${it.desc}\n効果:${it.effect}`;
+      el.title = `${it.name}\n${it.desc}\n効果:${it.effect}\nレシピ:${it.recipe||'-'}`;
     } else {
       el.innerHTML = `<span class="slotNum">${i+1}</span>`;
     }
@@ -796,13 +859,13 @@ function renderInventory(){
 function slotIcon(cat){
   const map = {"木材系":"🪵","石材系":"🪨","金属系":"⚙️","布系":"🧵","食材系":"🍠","飲料系":"🥤",
     "調理器具系":"🍳","衣類系":"👕","靴系":"👞","家具系":"🪑","建材系":"🧱","農業系":"🌱","工具系":"🔧",
-    "電化系":"🔌","車両系":"🚗","医療系":"💊","会社系":"📇","法務・警察系":"🚓","生活雑貨系":"🧺","装飾・高級品系":"💎"};
+    "電化系":"🔌","車両系":"🚗","医療系":"💊","会社系":"📇","法務・警察系":"🚓","生活雑貨系":"🧺","装飾・高級品系":"💎","種":"🌰"};
   return map[cat]||"📦";
 }
 renderInventory();
 
 /* ---------------------------------------------------------------------------------
-   5. ステータス更新(HP/満腹/所持金/犯罪)
+   5. ステータス更新
 --------------------------------------------------------------------------------- */
 function refreshHud(){
   document.getElementById('hpBar').style.width = Math.max(0,state.hp)+'%';
@@ -842,16 +905,16 @@ function raiseCrime(v){
 }
 function arrestPlayer(){
   state.wanted=false; state.crimeValue=0; state.status='懲役中';
-  state.jailedUntil = simTime.totalMinutes + (3*7*24*60/ (60/ DAY_LENGTH_MIN)); // 概算: 懲役3週間
+  state.jailedUntil = simTime.totalMinutes + (3*7*24*60/ (60/ DAY_LENGTH_MIN));
   SND.alarm();
   toast('🚓 逮捕されました。懲役3週間です。');
   refreshHud();
 }
 
 /* ---------------------------------------------------------------------------------
-   6. 時間 / 天候システム (1日=24分換算)
+   6. 時間 / 天候システム
 --------------------------------------------------------------------------------- */
-const DAY_LENGTH_MIN = 24; // 実時間24分=ゲーム内1日
+const DAY_LENGTH_MIN = 24;
 const simTime = { totalMinutes:0, day:1, hour:8, weather:'晴れ' };
 const WEATHERS = ['晴れ','曇り','雨','快晴','霧'];
 function updateTime(deltaSec){
@@ -865,17 +928,17 @@ function updateTime(deltaSec){
   }
   document.getElementById('timeWeather').textContent =
     String(simTime.hour).padStart(2,'0')+':00 / '+simTime.weather+' / '+simTime.day+'日目';
+  updateSky(simTime.hour);
 }
 let lastWeatherChangeDay=0;
 function onNewDay(){
-  changeHunger(-100/7); // 1週間で食料必須 -> 1日あたり1/7消費
+  changeHunger(-100/14); // 満腹減少速度を半分に
   if(state.hunger<=30) toast('⚠ お腹が空いています。市場で食料を買いましょう');
   if(state.hunger<=0) toast('💀 飢餓状態です。HPが減少します');
   if(simTime.day - lastWeatherChangeDay >= 1){
     simTime.weather = WEATHERS[Math.floor(Math.random()*WEATHERS.length)];
     lastWeatherChangeDay = simTime.day;
   }
-  // 会社員給与・報酬の日次処理(金庫に給与分が無いと支払われず、未払いが続くと退社)
   if(state.company && state.company.role==='社員'){
     const c = companies.find(cc=>cc.name===state.company.name);
     if(c){
@@ -894,7 +957,6 @@ function onNewDay(){
       }
     }
   }
-  // 農地収入の日次処理
   if(state.farmPlots && state.farmPlots.length){
     let total = 0;
     state.farmPlots.forEach(f=>{ total += f.sellPrice; });
@@ -916,6 +978,28 @@ const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x2a8fd8);
 scene.fog = new THREE.Fog(0x2a8fd8, 60, 240);
 
+// 昼夜の空の色(夜は紺色になる)
+const SKY_DAY = new THREE.Color(0x2a8fd8);
+const SKY_NIGHT = new THREE.Color(0x0c1740); // 紺色
+const SKY_SUNSET = new THREE.Color(0x3a4a7a);
+let _lastSkyHour = -1;
+function updateSky(hour){
+  if(hour === _lastSkyHour) return;
+  _lastSkyHour = hour;
+  let c;
+  if(hour>=20 || hour<5){ c = SKY_NIGHT; } // 夜🌙: 20時〜5時は紺色
+  else if(hour>=18 && hour<20){ c = SKY_SUNSET; } // 夕方は中間色
+  else if(hour>=5 && hour<7){ c = SKY_SUNSET; } // 明け方も中間色
+  else { c = SKY_DAY; }
+  scene.background = c.clone();
+  scene.fog.color = c.clone();
+  // 夜は太陽光を弱め、月明かり風の薄暗さにする
+  const isNight = (hour>=20 || hour<5);
+  sunLightRef && (sunLightRef.intensity = isNight? 0.25 : 1.1);
+  hemiLightRef && (hemiLightRef.intensity = isNight? 0.35 : 1.0);
+}
+let sunLightRef=null, hemiLightRef=null;
+
 const camera = new THREE.PerspectiveCamera(72, window.innerWidth/window.innerHeight, 0.1, 1000);
 camera.position.set(350,1.7,350);
 
@@ -927,10 +1011,9 @@ sun.castShadow = true;
 sun.shadow.mapSize.set(1024,1024);
 sun.shadow.camera.left=-300; sun.shadow.camera.right=300; sun.shadow.camera.top=300; sun.shadow.camera.bottom=-300;
 scene.add(sun);
+sunLightRef = sun; hemiLightRef = hemi;
 
-// ----- 地面: ブロックグリッド(700x700、1マス=1m, 表示は中心400x400に簡略=パフォーマンス) -----
 const WORLD_SIZE = 700;
-const BLOCK = 1;
 const groundGroup = new THREE.Group();
 scene.add(groundGroup);
 
@@ -942,7 +1025,6 @@ groundMesh.position.set(350,0,350);
 groundMesh.receiveShadow = true;
 groundGroup.add(groundMesh);
 
-// グリッド境界線(ブロック1マスごとの四角い境界線) — 描画負荷対策で視点周辺のみ動的生成
 const gridHelperGroup = new THREE.Group();
 scene.add(gridHelperGroup);
 const gridLineMat = new THREE.LineBasicMaterial({color:0x163d12, transparent:true, opacity:0.45});
@@ -962,38 +1044,35 @@ function rebuildLocalGrid(centerX, centerZ, radius=18){
   gridHelperGroup.add(lines);
 }
 
-// ----- ハイライトブロック(マイクラ風カーソル選択) -----
 const highlightGeo = new THREE.BoxGeometry(1.02,1.02,1.02);
 const highlightMat = new THREE.MeshBasicMaterial({color:0xffffff, transparent:true, opacity:0.35});
 const highlightMesh = new THREE.Mesh(highlightGeo, highlightMat);
 highlightMesh.visible = false;
 scene.add(highlightMesh);
 
-// ----- 設置済みブロック管理 -----
-const placedBlocks = new Map(); // key "x,y,z" -> mesh
+const placedBlocks = new Map();
 const blockMatCache = {
   "土ブロック": new THREE.MeshLambertMaterial({color:0x6b4423}),
   "木壁": new THREE.MeshLambertMaterial({color:0xa8631c}),
   "石壁": new THREE.MeshLambertMaterial({color:0x6f6f6f}),
-  "オフィスマット": new THREE.MeshLambertMaterial({color:0x4a4a4a}),
   "家土地マット": new THREE.MeshLambertMaterial({color:0xffffff}),
-  "会社土地マット": new THREE.MeshLambertMaterial({color:0x4a4a4a}),
-  "農地マット": new THREE.MeshLambertMaterial({color:0x5c3315}),
+  "会社土地マット": new THREE.MeshLambertMaterial({color:0x808080}),
+  "農地マット": new THREE.MeshLambertMaterial({color:0x8b5a2b}),
   "default": new THREE.MeshLambertMaterial({color:0xaa3333}),
 };
 const CATEGORY_COLOR = {
   "木材系":0x8a5a2a, "石材系":0x707070, "金属系":0x5a6470, "布系":0xb02a4a, "食材系":0xc97a1f,
   "飲料系":0x1f7ac9, "調理器具系":0x444444, "衣類系":0x7a2ab0, "靴系":0x4a3a2a, "家具系":0xa0682a,
   "建材系":0x808080, "農業系":0x4a7a1f, "工具系":0x999999, "電化系":0x1f9ec9, "車両系":0xc91f3a,
-  "医療系":0xe04040, "会社系":0x2a4ea8, "法務・警察系":0x1a2a6a, "生活雑貨系":0x3a8a6a, "装飾・高級品系":0xd8a93a
+  "医療系":0xe04040, "会社系":0x2a4ea8, "法務・警察系":0x1a2a6a, "生活雑貨系":0x3a8a6a, "装飾・高級品系":0xd8a93a, "種":0x6b8f3a
 };
 const DESK_ITEMS = ["社長机","書斎机","木机"];
 function isChestItem(name){
   const it = findItem(name);
   if(!it) return false;
-  return it.effect.includes('収納') || name==='木箱';
+  return (it.effect && it.effect.includes('収納')) || name==='木箱';
 }
-const chests = new Map(); // blockKey -> {items: [...]}
+const chests = new Map();
 function blockKey(x,y,z){ return x+","+y+","+z; }
 function placeBlockAt(x,y,z,type,cat){
   const k = blockKey(x,y,z);
@@ -1010,21 +1089,19 @@ function placeBlockAt(x,y,z,type,cat){
   mesh.position.set(x+0.5, (isMat?0.06:0.5)+y, z+0.5);
   mesh.castShadow = true; mesh.receiveShadow = true;
   mesh.userData.type = type;
+  mesh.userData.cat = cat;
   scene.add(mesh);
   placedBlocks.set(k, mesh);
   SND.place();
-  spawnParticle(mesh.position, isMat? (type==='家土地マット'?0xffffff:(type==='農地マット'?0x6b3e1a:0x4a4a4a)) : (mat.color?mat.color.getHex():0xffffff));
+  spawnParticle(mesh.position, isMat? (type==='家土地マット'?0xffffff:(type==='農地マット'?0x8b5a2b:0x808080)) : (mat.color?mat.color.getHex():0xffffff));
 
-  // 家土地マットの上にホームマーカー(⬇️矢印)を表示
   if(type==='家土地マット'){
     addHomeMarker(x+0.5, z+0.5);
   }
-  // 収納系アイテムはチェスト(収納箱)として機能させる
   if(isChestItem(type)){
     chests.set(k, {items: new Array(16).fill(null)});
     mesh.userData.isChest = true;
   }
-  // 机系アイテムはデスク(社員の労働判定マス)として機能させる
   if(DESK_ITEMS.includes(type)){
     mesh.userData.isDesk = true;
   }
@@ -1034,18 +1111,23 @@ function breakBlockAt(x,y,z){
   const k = blockKey(x,y,z);
   const mesh = placedBlocks.get(k);
   if(!mesh) return false;
+  const type = mesh.userData.type;
+  const cat = mesh.userData.cat;
   scene.remove(mesh);
   placedBlocks.delete(k);
   if(chests.has(k)) chests.delete(k);
   SND.breakBlock();
   spawnParticle(mesh.position, 0xa8631c);
+  // ブロックを壊したらアイテムをドロップする
+  const it = findItem(type);
+  if(it){
+    dropItemAt(it.id, 1, it.name, new THREE.Vector3(x+0.5, 0.5, z+0.5));
+  }
   return true;
 }
 
-// ----- 自分の家マーカー(浮いている⬇️) -----
 const homeMarkers = [];
 function addHomeMarker(x,z){
-  // 既存マーカーがあれば再利用せず追加(複数土地に対応)
   const cv = document.createElement('canvas'); cv.width=64; cv.height=64;
   const ctx2 = cv.getContext('2d'); ctx2.font='48px serif'; ctx2.textAlign='center'; ctx2.fillText('⬇️',32,48);
   const tex = new THREE.CanvasTexture(cv);
@@ -1062,8 +1144,24 @@ function updateHomeMarkers(t){
   });
 }
 
-// ----- 木(伐採対象) -----
+/* ---------------------------------------------------------------------------------
+   木(伐採対象) — 切ったら同数を別のランダムな場所に再生成。種は木の近くに必ず1個落ちる(種類ランダム)
+--------------------------------------------------------------------------------- */
 const trees = [];
+const FOREST_BANDS = [[0,150,550,700],[600,700,0,200]];
+function isInForestBand(x,z){
+  return FOREST_BANDS.some(([x0,x1,z0,z1])=> x>=x0&&x<=x1&&z>=z0&&z<=z1);
+}
+function randomForestSpot(){
+  if(Math.random()<0.7){
+    const band = FOREST_BANDS[Math.floor(Math.random()*FOREST_BANDS.length)];
+    return { x: band[0]+Math.random()*(band[1]-band[0]), z: band[2]+Math.random()*(band[3]-band[2]) };
+  } else {
+    const ang = Math.random()*Math.PI*2;
+    const r = 30+Math.random()*90;
+    return { x:350+Math.cos(ang)*r, z:350+Math.sin(ang)*r };
+  }
+}
 function makeTree(x,z){
   const g = new THREE.Group();
   const trunkMat = new THREE.MeshLambertMaterial({color:0x5a3414});
@@ -1080,17 +1178,14 @@ function makeTree(x,z){
   trees.push(g);
   return g;
 }
-// 森エリア(指定座標帯)に木を多数配置(本数3倍)
 function scatterForest(){
-  const bands = [[0,150,550,700],[600,700,0,200]]; // 北西/南東 概略
-  bands.forEach(([x0,x1,z0,z1])=>{
+  FOREST_BANDS.forEach(([x0,x1,z0,z1])=>{
     for(let i=0;i<180;i++){
       const x = x0+Math.random()*(x1-x0);
       const z = z0+Math.random()*(z1-z0);
       makeTree(x,z);
     }
   });
-  // 中心近くにも見本の木をいくつか(到達しやすいように)
   for(let i=0;i<75;i++){
     const ang = Math.random()*Math.PI*2;
     const r = 40+Math.random()*60;
@@ -1099,7 +1194,6 @@ function scatterForest(){
 }
 scatterForest();
 
-// ----- 固定施設(噴水/市場/警察/不動産/会社街) — 四角い建物は使わず円柱形状にする -----
 function cylinderFacility(name,x,z,radius,h,color,segs=16){
   const m = new THREE.Mesh(new THREE.CylinderGeometry(radius,radius*1.05,h,segs), new THREE.MeshLambertMaterial({color}));
   m.position.set(x,h/2,z);
@@ -1108,7 +1202,6 @@ function cylinderFacility(name,x,z,radius,h,color,segs=16){
   scene.add(m);
   return m;
 }
-// 噴水
 const fountainGroup = new THREE.Group();
 const fountainBase = new THREE.Mesh(new THREE.CylinderGeometry(4,4.4,0.8,20), new THREE.MeshLambertMaterial({color:0xb8c8d8}));
 fountainBase.position.set(350,0.4,350);
@@ -1121,11 +1214,9 @@ scene.add(fountainGroup);
 cylinderFacility('市場', 445, 345, 16, 5, 0xc98a1f, 10);
 cylinderFacility('bot警察署', 262, 342, 9, 6, 0x2a4ea8, 8);
 cylinderFacility('bot不動産', 352, 215, 8.5, 5, 0xb8901f, 8);
-for(let i=0;i<8;i++){ // 会社区画(複数オフィス、円柱)
+for(let i=0;i<8;i++){
   cylinderFacility('会社区画'+i, 300+i*30, 500+(i%3)*30, 8, 5, 0x383838, 8);
 }
-// ※初期から散らばる住宅は配置しない(プレイヤーが不動産で取得し自分で設置する)
-// 農地表示(緑の畝 — 細長い円柱で表現し四角を排除)
 for(let i=0;i<14;i++){
   const f = new THREE.Mesh(new THREE.CylinderGeometry(1,1,0.3,8), new THREE.MeshLambertMaterial({color:0x5c3315}));
   f.scale.set(4,1,1);
@@ -1133,15 +1224,14 @@ for(let i=0;i<14;i++){
   scene.add(f);
 }
 
-// ----- 他プレイヤー表示用 -----
-const remoteMeshes = {}; // id -> {mesh, label}
+const remoteMeshes = {};
 function createPlayerMesh(skin){
   const g = new THREE.Group();
   const body = new THREE.Mesh(new THREE.CapsuleGeometry?new THREE.CapsuleGeometry(0.3,0.9,4,8):new THREE.CylinderGeometry(0.3,0.3,1.2,8),
     new THREE.MeshLambertMaterial({color:0xe8a955}));
   body.position.y=0.9; body.castShadow=true;
   g.add(body);
-  // ラベル(絵文字)はCanvasスプライトで表現
+  // スプライトは常にカメラの方を向くため、相手から見ても自分の絵文字が正しく見える
   const cv = document.createElement('canvas'); cv.width=64; cv.height=64;
   const ctx2 = cv.getContext('2d'); ctx2.font='48px serif'; ctx2.textAlign='center'; ctx2.fillText(skin||"🙂",32,48);
   const tex = new THREE.CanvasTexture(cv);
@@ -1168,16 +1258,16 @@ function stickStart(x,y,id){
 function stickMove(x,y){
   if(!stickActive) return;
   let dx=x-stickCenter.x, dy=y-stickCenter.y;
-  const max=42;
+  const max=36;
   const dist = Math.hypot(dx,dy);
   if(dist>max){ dx=dx/dist*max; dy=dy/dist*max; }
-  stickKnob.style.left = (36+dx)+'px';
-  stickKnob.style.top = (36+dy)+'px';
+  stickKnob.style.left = (30+dx)+'px';
+  stickKnob.style.top = (30+dy)+'px';
   input.moveX = dx/max; input.moveZ = dy/max;
 }
 function stickEnd(){
   stickActive=false; stickTouchId=null;
-  stickKnob.style.left='36px'; stickKnob.style.top='36px';
+  stickKnob.style.left='30px'; stickKnob.style.top='30px';
   input.moveX=0; input.moveZ=0;
 }
 document.getElementById('moveStick').addEventListener('touchstart', e=>{
@@ -1192,10 +1282,9 @@ document.getElementById('moveStick').addEventListener('mousedown', e=>{ stickSta
 window.addEventListener('mousemove', e=>{ if(stickActive && stickTouchId==='mouse') stickMove(e.clientX,e.clientY); });
 window.addEventListener('mouseup', e=>{ if(stickTouchId==='mouse') stickEnd(); });
 
-// 視点操作: 画面ドラッグ(スティック・行動ボタン以外の領域)
 let lookActive=false, lookTouchId=null, lastLook={x:0,y:0};
 function isUiTarget(el){
-  return el.closest('#moveStick, #invBar, #leftSide, #rightSide, #hudTop, #menuBtn, #tabBar, #reportBtn, .panelOverlay, #pickupPrompt, #receiveUI');
+  return el.closest('#moveStick, #invBar, #leftBottomSide, #rightSide, #hudTop, #menuBtn, #tabBar, #reportBtn, .panelOverlay, #pickupPrompt, #receiveUI, #saveBtn, #saveStatus');
 }
 canvas.addEventListener('touchstart', e=>{
   for(const t of e.changedTouches){
@@ -1223,7 +1312,6 @@ function applyLook(dx,dy){
   state.pitch = Math.max(-1.3, Math.min(1.3, state.pitch));
 }
 
-// 行動ボタン
 document.getElementById('btnDash').addEventListener('touchstart', ()=>{ input.dashing=true; });
 document.getElementById('btnDash').addEventListener('touchend', ()=>{ input.dashing=false; });
 document.getElementById('btnDash').addEventListener('mousedown', ()=>{ input.dashing=true; });
@@ -1232,6 +1320,7 @@ document.getElementById('btnDash').addEventListener('mouseup', ()=>{ input.dashi
 document.getElementById('btnCrouch').addEventListener('click', ()=>{
   input.crouching = !input.crouching;
   document.getElementById('btnCrouch').classList.toggle('pressed', input.crouching);
+  document.getElementById('crosshair').classList.toggle('placeMode', input.crouching);
 });
 
 document.getElementById('btnSwing').addEventListener('click', ()=>{ pressFx('btnSwing'); doSwing(); });
@@ -1248,7 +1337,6 @@ function pressFx(id){
   setTimeout(()=>el.classList.remove('bouncy'),500);
 }
 
-// スロット数字キー(デスクトップ用)
 window.addEventListener('keydown', e=>{
   if(e.key>='1' && e.key<='9'){ state.selectedSlot = parseInt(e.key)-1; renderInventory(); }
   if(e.key==='0'){ state.selectedSlot=9; renderInventory(); }
@@ -1256,24 +1344,21 @@ window.addEventListener('keydown', e=>{
 
 /* ---------------------------------------------------------------------------------
    9. 選択中ブロック/対象の検出(レイキャスト)
+   しゃがみ中は「破壊⇄設置」の判定を反転させる(ブロックの上に新しいブロックを置ける)
 --------------------------------------------------------------------------------- */
 const raycaster = new THREE.Raycaster();
 const centerNDC = new THREE.Vector2(0,0);
-let targetBlock = null; // {x,y,z, exists}
+let targetBlock = null;
 let targetTree = null;
 let targetFacility = null;
 
 function updateRaycast(){
   raycaster.setFromCamera(centerNDC, camera);
   raycaster.far = 6;
-  // 1. 既存ブロックとの当たり判定
   const blockMeshes = Array.from(placedBlocks.values());
   let hit = raycaster.intersectObjects(blockMeshes, false)[0];
-  // 2. 木との当たり判定
   let hitTree = raycaster.intersectObjects(trees, true)[0];
-  // 3. 地面との当たり判定(設置先プレビュー)
   let hitGround = raycaster.intersectObject(groundMesh, false)[0];
-  // 4. 施設
   const facilities = scene.children.filter(c=>c.userData && c.userData.facility);
   let hitFac = raycaster.intersectObjects(facilities, false)[0];
 
@@ -1299,14 +1384,25 @@ function updateRaycast(){
   }
   if(hit && hit.distance < 5){
     const p = hit.object.position;
-    targetBlock = {x:Math.floor(p.x), y:Math.round(p.y-0.5), z:Math.floor(p.z), exists:true};
-    highlightMesh.visible = true;
-    highlightMesh.position.set(targetBlock.x+0.5, targetBlock.y+0.5, targetBlock.z+0.5);
-    document.getElementById('blockHint').style.display='block';
-    if(hit.object.userData.isChest){
-      document.getElementById('blockHint').textContent = '収納箱 (拾う/話すボタンで開く・振るで破壊)';
+    const by = Math.round(p.y-0.5);
+    const bx = Math.floor(p.x), bz = Math.floor(p.z);
+    if(input.crouching){
+      // しゃがみ中: このブロックの上に新ブロックを設置する
+      targetBlock = {x:bx, y:by+1, z:bz, exists: placedBlocks.has(blockKey(bx,by+1,bz))};
+      highlightMesh.visible = true;
+      highlightMesh.position.set(bx+0.5, by+1.5, bz+0.5);
+      document.getElementById('blockHint').style.display='block';
+      document.getElementById('blockHint').textContent = targetBlock.exists? '(上は塞がっています)' : '設置 (振るボタン・しゃがみ中)';
     } else {
-      document.getElementById('blockHint').textContent = '破壊 (振るボタン)';
+      targetBlock = {x:bx, y:by, z:bz, exists:true};
+      highlightMesh.visible = true;
+      highlightMesh.position.set(bx+0.5, by+0.5, bz+0.5);
+      document.getElementById('blockHint').style.display='block';
+      if(hit.object.userData.isChest){
+        document.getElementById('blockHint').textContent = '収納箱 (拾う/話すボタンで開く・振るで破壊)';
+      } else {
+        document.getElementById('blockHint').textContent = '破壊 (振るボタン)';
+      }
     }
     return;
   }
@@ -1330,26 +1426,37 @@ function doSwing(){
     SND.breakBlock();
     spawnParticle(targetTree.position.clone().add(new THREE.Vector3(0,1,0)), 0x6b4423);
     if(targetTree.userData.hp<=0){
-      const treePosForSeed = targetTree.position.clone();
+      const treePos = targetTree.position.clone();
       scene.remove(targetTree);
       trees.splice(trees.indexOf(targetTree),1);
       targetTree=null;
       const woodItem = findItem('丸棒');
       addItem(woodItem.id, 1+Math.floor(Math.random()*2));
       gainMoney(100,'伐採報酬');
-      let msg = '木を伐採しました(丸棒を入手)';
-      if(isInForestBand(treePosForSeed.x, treePosForSeed.z) && Math.random()<0.18){
-        addItem(findItem('種袋').id, 1);
-        msg += ' / 種袋を発見しました!';
-      }
-      toast(msg);
+      // 種は木の近くに必ず1個落ちる(種類はランダム)
+      const seedName = SEED_NAMES[Math.floor(Math.random()*SEED_NAMES.length)];
+      const seedItem = findItem(seedName);
+      const dropPos = treePos.clone().add(new THREE.Vector3((Math.random()-0.5)*1.2, 0.4, (Math.random()-0.5)*1.2));
+      dropItemAt(seedItem.id, 1, seedItem.name, dropPos);
+      toast('木を伐採しました(丸棒入手)。近くに'+seedItem.name+'が落ちています');
+      // 切った分だけランダムな場所に木を再生成
+      const spot = randomForestSpot();
+      makeTree(spot.x, spot.z);
     } else {
       toast('木を切っています…('+targetTree.userData.hp+')');
     }
     return;
   }
   if(targetBlock){
-    if(targetBlock.exists){
+    if(input.crouching){
+      // しゃがみ中は設置モード固定(ブロックの上に置く、もしくは地面に置く)
+      if(targetBlock.exists){ toast('そこには既にブロックがあります'); SND.fail(); return; }
+      const slot = state.inventory[state.selectedSlot];
+      if(!slot){ toast('設置するアイテムがありません'); SND.fail(); return; }
+      const it = findItemById(slot.itemId);
+      const ok = placeBlockAt(targetBlock.x, targetBlock.y, targetBlock.z, it.name, it.cat);
+      if(ok){ removeItemAt(state.selectedSlot,1); toast(it.name+'を設置しました'); }
+    } else if(targetBlock.exists){
       breakBlockAt(targetBlock.x, targetBlock.y, targetBlock.z);
       toast('ブロックを破壊しました');
     } else {
@@ -1362,8 +1469,6 @@ function doSwing(){
   }
 }
 function doHeave(){
-  // 構え→大きな動作。武器/道具の振りかざし(攻撃力・演出強化版)
-  SND.tone && null;
   toast('ふりかざした!(大きな一振り)');
   SND.success();
   if(targetTree){ targetTree.userData.hp -= 2; spawnParticle(targetTree.position.clone().add(new THREE.Vector3(0,1,0)), 0x6b4423); }
@@ -1422,7 +1527,7 @@ function enterFacility(fac){
 }
 
 /* ---------------------------------------------------------------------------------
-   11. ワールドドロップ(社員へのお金ドロップ/アイテムドロップ)
+   11. ワールドドロップ
 --------------------------------------------------------------------------------- */
 const worldDrops = [];
 function dropSelectedItem(){
@@ -1441,7 +1546,6 @@ function updateWorldDrops(t){
   });
 }
 
-/* ---- 収納箱(チェスト)UI ---- */
 let currentChestKey = null;
 function openChest(x,y,z){
   currentChestKey = blockKey(x,y,z);
@@ -1472,7 +1576,6 @@ function moveInvToChest(idx){
   if(!slot) return;
   const chest = chests.get(currentChestKey);
   if(!chest) return;
-  // 既存スタックへ統合 or 空きスロットへ
   for(const cs of chest.items){ if(cs && cs.itemId===slot.itemId && cs.qty<60){ const add=Math.min(60-cs.qty, slot.qty); cs.qty+=add; slot.qty-=add; break; } }
   if(slot.qty>0){
     const empty = chest.items.findIndex(c=>!c);
@@ -1493,17 +1596,20 @@ function moveChestToInv(idx){
   renderChestPanel();
   SND.coin();
 }
-function dropItemInFront(itemId, qty, label){
-  const dir = new THREE.Vector3(Math.sin(state.yaw), 0, Math.cos(state.yaw));
-  const pos = camera.position.clone().add(dir.multiplyScalar(1.2)); pos.y=0.55;
+function dropItemAt(itemId, qty, label, pos){
   const it = findItemById(itemId);
   const color = CATEGORY_COLOR[it ? it.cat : '建材系'] || 0xd8a93a;
-  const geo = new THREE.BoxGeometry(0.28,0.28,0.28);
+  const geo = new THREE.BoxGeometry(0.26,0.26,0.26);
   const mat = new THREE.MeshLambertMaterial({color});
   const mesh = new THREE.Mesh(geo,mat); mesh.position.copy(pos); mesh.castShadow=true;
   mesh.rotation.set(Math.random()*0.4, Math.random()*Math.PI, Math.random()*0.4);
   scene.add(mesh);
-  worldDrops.push({mesh, itemId, qty, name:label, pos, baseY:pos.y});
+  worldDrops.push({mesh, itemId, qty, name:label, pos:pos.clone(), baseY:pos.y});
+}
+function dropItemInFront(itemId, qty, label){
+  const dir = new THREE.Vector3(Math.sin(state.yaw), 0, Math.cos(state.yaw));
+  const pos = camera.position.clone().add(dir.multiplyScalar(1.2)); pos.y=0.55;
+  dropItemAt(itemId, qty, label, pos);
 }
 function dropMoneyInFront(amount){
   const dir = new THREE.Vector3(Math.sin(state.yaw), 0, Math.cos(state.yaw));
@@ -1547,7 +1653,7 @@ function receiveAnswer(yes){
 }
 
 /* ---------------------------------------------------------------------------------
-   12. パーティクル(気持ちいい演出)
+   12. パーティクル
 --------------------------------------------------------------------------------- */
 const particles = [];
 function spawnParticle(pos,color){
@@ -1573,11 +1679,11 @@ function updateParticles(dt){
 }
 
 /* ---------------------------------------------------------------------------------
-   13. 移動・物理 (指定数値を正確反映)
+   13. 移動・物理
 --------------------------------------------------------------------------------- */
 const MOVE = {
-  walk:4.5, run:6.8, crouch:2.3, back:3.6, strafe:4.1,
-  jumpHeight:1.15, gravity: -2*1.15/(0.55*0.55), // h = 1/2 g t^2 (滞空0.55s換算の半分=上昇時間)
+  walk:13.5, run:20.4, crouch:6.9, back:10.8, strafe:12.3, // 移動速度を3倍に
+  jumpHeight:1.15, gravity: -2*1.15/(0.55*0.55),
   standEye:1.7, crouchEye:1.05,
 };
 let velocityY = 0;
@@ -1592,8 +1698,6 @@ function tryJump(){
     SND.jump();
   }
 }
-document.getElementById('btnPick'); // noop ref guard
-
 window.addEventListener('keydown', e=>{ if(e.code==='Space') tryJump(); });
 
 function updateMovement(dt){
@@ -1601,7 +1705,8 @@ function updateMovement(dt){
   const forward = new THREE.Vector3(Math.sin(state.yaw), 0, Math.cos(state.yaw));
   const right = new THREE.Vector3(Math.sin(state.yaw+Math.PI/2),0,Math.cos(state.yaw+Math.PI/2));
 
-  const mx = input.moveX, mz = -input.moveZ; // 上が前進
+  // スティックの前後方向を反転(人間の感覚に合わせる)。左右はそのまま。
+  const mx = input.moveX, mz = input.moveZ;
   const moving = Math.hypot(mx,mz) > 0.08;
 
   let moveVec = new THREE.Vector3();
@@ -1611,7 +1716,6 @@ function updateMovement(dt){
 
   const accel = input.dashing? 0.12 : 0.08;
   const targetSpeed = moving? speed : 0;
-  // 簡易加減速(指定の加速時間に近似)
   camera.userData.curSpeed = camera.userData.curSpeed||0;
   camera.userData.curSpeed += (targetSpeed - camera.userData.curSpeed) * Math.min(1, dt/accel);
 
@@ -1621,17 +1725,14 @@ function updateMovement(dt){
   camera.position.x = Math.max(2, Math.min(WORLD_SIZE-2, camera.position.x));
   camera.position.z = Math.max(2, Math.min(WORLD_SIZE-2, camera.position.z));
 
-  // しゃがみによる視点の高さ変化(なめらかに遷移)
   const targetEye = input.crouching ? MOVE.crouchEye : MOVE.standEye;
   eyeHeight += (targetEye - eyeHeight) * Math.min(1, dt/0.18);
 
-  // 重力/ジャンプ
   velocityY += MOVE.gravity*dt;
   camera.position.y += velocityY*dt;
   if(camera.position.y <= eyeHeight){ camera.position.y=eyeHeight; velocityY=0; if(!onGround){onGround=true; SND.land();} }
   else if(onGround){ camera.position.y = eyeHeight; }
 
-  // カメラ揺れ(歩き/走り)
   if(moving && onGround){
     walkCycle += dt*(input.dashing?10:6.5);
     const bob = Math.sin(walkCycle)*(input.dashing?0.045:0.025)*(input.crouching?0.4:1);
@@ -1660,7 +1761,7 @@ function updateWork(dt){
       state.trust = Math.min(100, state.trust+1);
       const co = companies.find(c=>c.name===state.company.name);
       if(co){
-        co.treasury += 30; // 社員が働くと社長に神報酬(会社金庫)が入る
+        co.treasury += 30;
         toast('💼 勤務実績+10秒(信頼:'+state.trust+') 社長に神報酬+30金が入りました');
       }
       refreshHud();
@@ -1670,15 +1771,16 @@ function updateWork(dt){
 function updateMiniMap(){
   const mm = document.getElementById('miniMap');
   mm.innerHTML='';
+  const mmSize = mm.clientWidth || 78;
   const selfDot = document.createElement('div');
   selfDot.className='mmDot mmSelf';
-  const px = (state.pos.x/WORLD_SIZE)*110, pz=(state.pos.z/WORLD_SIZE)*110;
+  const px = (state.pos.x/WORLD_SIZE)*mmSize, pz=(state.pos.z/WORLD_SIZE)*mmSize;
   selfDot.style.left = px+'px'; selfDot.style.top = pz+'px';
   mm.appendChild(selfDot);
   for(const id in remoteMeshes){
     const r = remoteMeshes[id];
     const d = document.createElement('div'); d.className='mmDot';
-    d.style.left = ((r.x/WORLD_SIZE)*110)+'px'; d.style.top=((r.z/WORLD_SIZE)*110)+'px';
+    d.style.left = ((r.x/WORLD_SIZE)*mmSize)+'px'; d.style.top=((r.z/WORLD_SIZE)*mmSize)+'px';
     mm.appendChild(d);
   }
 }
@@ -1686,11 +1788,13 @@ function updateMiniMap(){
 /* ---------------------------------------------------------------------------------
    15. ウィンドウリサイズ
 --------------------------------------------------------------------------------- */
-window.addEventListener('resize', ()=>{
+function handleResize(){
   camera.aspect = window.innerWidth/window.innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight);
-});
+}
+window.addEventListener('resize', handleResize);
+window.addEventListener('orientationchange', ()=>setTimeout(handleResize,200));
 
 /* ---------------------------------------------------------------------------------
    16. パネル開閉
@@ -1708,13 +1812,13 @@ function closePanel(id){ document.getElementById(id).style.display='none'; }
 document.getElementById('menuBtn').addEventListener('click', ()=>openPanel('menuPanel'));
 
 /* ---------------------------------------------------------------------------------
-   17. 家パネル(クラフト/収納/掲示板/服デザイン/土地管理)
+   17. 家パネル
 --------------------------------------------------------------------------------- */
 function houseTab(tab){
   document.querySelectorAll('#housePanel .miniTabs button').forEach(b=>b.classList.toggle('active', b.dataset.h===tab));
   const c = document.getElementById('houseContent');
   if(tab==='craft'){
-    let html = `<div class="smallNote">設計を選んでクラフトします(素材消費あり)。15回相当の選択肢を簡略統合し、カテゴリ→アイテムの2段階選択で再現しています。</div>`;
+    let html = `<div class="smallNote">設計を選んでクラフトします(素材消費あり)。カテゴリ→アイテムの2段階選択。レシピは目安表示です。</div>`;
     html += `<select id="craftCat" onchange="renderCraftItems()">`+Object.keys(ITEM_DB).map(c=>`<option>${c}</option>`).join('')+`</select>`;
     html += `<div id="craftItemList"></div>`;
     c.innerHTML = html;
@@ -1761,15 +1865,14 @@ function houseTab(tab){
 function renderCraftItems(){
   const cat = document.getElementById('craftCat').value;
   const list = document.getElementById('craftItemList');
-  list.innerHTML = ITEM_DB[cat].map(([name,desc,effect,price])=>{
-    return `<div class="itemRow"><span><span class="nm">${name}</span><br><span class="ds">${desc} / ${effect}</span></span>
+  list.innerHTML = ITEM_DB[cat].map(([name,desc,effect,recipe,price,purchasable])=>{
+    return `<div class="itemRow"><span><span class="nm">${name}</span><br><span class="ds">${desc} / ${effect}</span><span class="rc">レシピ: ${recipe}</span></span>
       <button onclick="craftItem('${name.replace(/'/g,"\\'")}')">作成</button></div>`;
   }).join('');
 }
 function craftItem(name){
   const it = findItem(name);
   if(!it){ return; }
-  // 簡易素材コスト: 売値の40%相当の金を消費(資材ロジックの代用として一貫運用)
   const cost = Math.ceil(it.basePrice*0.4);
   if(!spendMoney(cost,'クラフト素材費')) return;
   addItem(it.id,1);
@@ -1801,15 +1904,15 @@ function plantSeedOnFarm(x,z){
   if(!farmUnlocked()){ toast('農業は会社を作れる段階(会社所属、または会社土地マット50個)に達すると解放されます'); SND.fail(); return; }
   const hiMat = findItem('高級農地マット');
   if(countItem(hiMat.id) < 1){ toast('種を植えるには「高級農地マット」が1個必要です(不動産で購入できます)'); SND.fail(); return; }
-  const seed = findItem('種袋');
-  const idx = state.inventory.findIndex(s=>s && s.itemId===seed.id);
-  if(idx<0){ toast('種袋がありません(森で木を伐採すると稀に入手できます)'); SND.fail(); return; }
+  const seedIdx = state.inventory.findIndex(s=> s && SEED_NAMES.includes(findItemById(s.itemId).name));
+  if(seedIdx<0){ toast('種がありません(木を伐採すると近くに落ちています)'); SND.fail(); return; }
+  const seedItem = findItemById(state.inventory[seedIdx].itemId);
   const hiIdx = state.inventory.findIndex(s=>s && s.itemId===hiMat.id);
   removeItemAt(hiIdx,1);
-  removeItemAt(idx,1);
+  removeItemAt(seedIdx,1);
   state.farmPlots = state.farmPlots || [];
-  state.farmPlots.push({x:Math.floor(x), z:Math.floor(z), seedName:seed.name, sellPrice:seed.price});
-  toast('高級農地マットを使って種を植えました!1日ごとに売値合計が収入として入ります');
+  state.farmPlots.push({x:Math.floor(x), z:Math.floor(z), seedName:seedItem.name, sellPrice:seedItem.price});
+  toast('高級農地マットを使って'+seedItem.name+'を植えました!1日ごとに売値合計が収入として入ります');
   SND.craft();
   houseTab('land');
 }
@@ -1884,7 +1987,6 @@ function foundCompany(){
   state.status='会社社長';
   toast('🎉 会社「'+name+'」を設立しました!');
   SND.success();
-  // 会社の浮遊ネームプレートを自分の現在地付近に設置(12マス上をゆっくり周回)
   addCompanyLabel(co, camera.position.x, camera.position.z);
   renderCompanyPanel(); refreshHud();
 }
@@ -1892,7 +1994,7 @@ function joinCompany(id){
   const co = companies.find(c=>c.id===id);
   if(!co){ return; }
   if(co.employees.length>=co.maxEmployees){ toast('社員枠が満員です'); return; }
-  const chance = Math.min(95, 40 + co.wage/5); // 給与が高いほど入社しやすい
+  const chance = Math.min(95, 40 + co.wage/5);
   if(Math.random()*100 > chance){
     toast('応募が通りませんでした(給与が低いようです。応募成功率:約'+Math.round(chance)+'%)');
     SND.fail();
@@ -1955,9 +2057,9 @@ function acquireOtherCompany(){
 }
 
 /* ---------------------------------------------------------------------------------
-   18b. 会社の浮遊ネームプレート(建物の12マス上をゆっくり周回しながら社名表示)
+   18b. 会社の浮遊ネームプレート
 --------------------------------------------------------------------------------- */
-const companyLabels = []; // {sprite, cx, cz, angle, radius, height}
+const companyLabels = [];
 function makeTextSprite(text, opts={}){
   const padding = 16;
   const fontSize = opts.fontSize || 40;
@@ -1991,7 +2093,7 @@ function addCompanyLabel(co, x, z){
 }
 function updateCompanyLabels(dt){
   companyLabels.forEach(l=>{
-    l.angle += dt*0.25; // ゆっくり回転
+    l.angle += dt*0.25;
     l.sprite.position.set(
       l.cx + Math.cos(l.angle)*l.radius,
       l.height,
@@ -2001,7 +2103,7 @@ function updateCompanyLabels(dt){
 }
 
 /* ---------------------------------------------------------------------------------
-   19. 市場パネル(需要供給による相場変動)
+   19. 市場パネル
 --------------------------------------------------------------------------------- */
 function renderMarketPanel(){
   const tabs = document.getElementById('marketCatTabs');
@@ -2015,23 +2117,23 @@ function renderMarketList(cat){
     const it = findItem(name);
     const owned = countItem(it.id);
     return `<div class="itemRow">
-      <span><span class="nm">${it.name}</span> <span class="tag">${Math.round(it.price)}金</span><br><span class="ds">${it.desc}</span></span>
+      <span><span class="nm">${it.name}</span> <span class="tag">${Math.round(it.price)}金</span>${it.purchasable?'':' <span class="tag" style="background:#f0d4d4">売却のみ</span>'}<br><span class="ds">${it.desc}</span><span class="rc">レシピ: ${it.recipe}</span></span>
       <span>
-        <button onclick="marketBuy(${it.id})">購入</button>
+        <button onclick="marketBuy(${it.id})" ${it.purchasable?'':'disabled'}>購入</button>
         <button onclick="marketSell(${it.id})" ${owned<=0?'disabled':''}>売る(${owned})</button>
       </span>
     </div>`;
   }).join('');
 }
 function adjustPrice(it, delta){
-  // 需要供給モデル: demand-supplyの差で価格を±最大40%まで変動
   it.demand = Math.max(0, Math.min(100, it.demand + (delta>0?6:-4)));
   it.supply = Math.max(0, Math.min(100, it.supply + (delta>0?-4:6)));
-  const ratio = (it.demand - it.supply)/100; // -1〜1
+  const ratio = (it.demand - it.supply)/100;
   it.price = Math.round(it.basePrice * (1 + Math.max(-0.4, Math.min(0.4, ratio))));
 }
 function marketBuy(id){
   const it = findItemById(id);
+  if(!it.purchasable){ toast('このアイテムは購入できません(売却のみ)'); SND.fail(); return; }
   if(!spendMoney(it.price, it.name+'購入')) return;
   addItem(it.id,1);
   adjustPrice(it, +1);
@@ -2078,11 +2180,10 @@ function buyLand(id){
   l.owner = state.name;
   state.ownedLand.push(l);
   state.status = state.status==='ホームレス' ? '土地所有者' : state.status;
-  // 土地の種類に応じたマットを10個付与
   let matName, matColorLabel;
   if(l.type==='住宅区画'){ matName='家土地マット'; matColorLabel='白'; }
   else if(l.type==='農地'){ matName='農地マット'; matColorLabel='茶'; }
-  else { matName='会社土地マット'; matColorLabel='灰'; } // 商業区画/会社区画
+  else { matName='会社土地マット'; matColorLabel='灰'; }
   const matItem = findItem(matName);
   addItem(matItem.id, 10);
   toast(l.type+'を取得しました!'+matName+'('+matColorLabel+')を10個受け取りました');
@@ -2123,7 +2224,7 @@ function renderPolicePanel(){
   document.getElementById('policeContent').innerHTML = html;
 }
 function reportNearby(){
-  raiseCrime(0); // 通報自体は自分の犯罪値を上げない(通報は他者対象という仕様だが単独デモのため自己完結)
+  raiseCrime(0);
   state.reportCount++;
   toast('📣 通報しました(受付済み)');
   SND.alarm();
@@ -2139,7 +2240,6 @@ function tryRelease(){
     toast('まだ釈放条件を満たしていません');
   }
 }
-// botパトロール(簡易AI): 一定間隔で指名手配中のプレイヤーを検出して逮捕判定
 setInterval(()=>{
   if(state.wanted && Math.random()<0.15){
     arrestPlayer();
@@ -2148,10 +2248,9 @@ setInterval(()=>{
 }, 8000);
 
 /* ---------------------------------------------------------------------------------
-   22. テレポート(噴水→隣丁)
+   22. テレポート
 --------------------------------------------------------------------------------- */
 function teleportToWorld(dir){
-  const map = {north:1,south:2,east:3,west:4};
   let target = state.world;
   if(dir==='north') target = state.world<4? state.world+1:1;
   if(dir==='south') target = state.world>1? state.world-1:4;
@@ -2166,16 +2265,16 @@ function teleportToWorld(dir){
 }
 
 /* ---------------------------------------------------------------------------------
-   23. WebRTC 手動シグナリング(P2P, 位置/チャット同期)
+   23. WebRTC 手動シグナリング
 --------------------------------------------------------------------------------- */
 const net = (()=>{
   let pc=null, dc=null, isOfferer=false;
-  const config = { iceCandidatePoolSize:4 }; // STUNなし=同一LAN/手動環境向け。必要に応じ追加可。
+  const config = { iceCandidatePoolSize:4 };
   function setStatus(t){ document.getElementById('netStatus').textContent = t; }
 
   function setupPC(){
     pc = new RTCPeerConnection(config);
-    pc.onicecandidate = ()=>{}; // ICE収集完了を待ってSDPをまとめて表示(トリクル無し簡易方式)
+    pc.onicecandidate = ()=>{};
     pc.onconnectionstatechange = ()=>{ setStatus('接続状態: '+pc.connectionState); };
     pc.ondatachannel = (e)=>{ dc = e.channel; bindChannel(dc); };
   }
@@ -2255,8 +2354,9 @@ const net = (()=>{
     }
   }
   setInterval(()=>{
+    // 自分のスキン(絵文字)を含めて送信 → 相手側で自分の見た目が正しく表示される
     send({t:'move', id:'self', x:state.pos.x, z:state.pos.z, yaw:state.yaw, name:state.name, skin:state.skin});
-  }, 1000/15); // 15Hz位置同期
+  }, 1000/15);
   return { createOffer, createAnswerFromOffer, acceptRemote, send };
 })();
 
@@ -2290,11 +2390,82 @@ document.getElementById('startBtn').addEventListener('click', ()=>{
   document.getElementById('titleScreen').style.display='none';
   refreshHud();
   toast('「'+state.name+'」として現世'+state.world+'に出生しました(ホームレス状態)');
+  startAutoSave();
+});
+document.getElementById('continueBtn').addEventListener('click', ()=>{
+  if(loadGame()){
+    SND.init();
+    document.getElementById('titleScreen').style.display='none';
+    refreshHud();
+    toast('セーブデータを読み込みました');
+    startAutoSave();
+  } else {
+    toast('セーブデータが見つかりません');
+  }
 });
 document.getElementById('netBtn').addEventListener('click', ()=>{ openPanel('signalingOverlay'); });
 
 document.getElementById('volRange').addEventListener('input', e=>{ SND.setVolume(e.target.value/100); });
 document.getElementById('sensRange').addEventListener('input', e=>{ sensitivity = e.target.value/100; });
+
+/* ---------------------------------------------------------------------------------
+   24b. セーブ/オートセーブ — タスクキルでもデータが消えないようlocalStorageへ保存
+--------------------------------------------------------------------------------- */
+function serializeGame(){
+  return {
+    state: state,
+    companies: companies,
+    landPlots: landPlots,
+    camPos: {x:camera.position.x, y:camera.position.y, z:camera.position.z},
+    yaw: state.yaw, pitch: state.pitch,
+    savedAt: Date.now()
+  };
+}
+function manualSave(){
+  try{
+    localStorage.setItem(SAVE_KEY, JSON.stringify(serializeGame()));
+    const btn = document.getElementById('saveBtn');
+    btn.classList.add('flash');
+    setTimeout(()=>btn.classList.remove('flash'),400);
+    document.getElementById('saveStatus').textContent = '保存済み '+new Date().toLocaleTimeString();
+    SND.save();
+  }catch(e){ console.error(e); toast('保存に失敗しました'); }
+}
+function autoSaveSilent(){
+  try{
+    localStorage.setItem(SAVE_KEY, JSON.stringify(serializeGame()));
+    document.getElementById('saveStatus').textContent = '自動保存 '+new Date().toLocaleTimeString();
+  }catch(e){ console.error(e); }
+}
+function loadGame(){
+  try{
+    const raw = localStorage.getItem(SAVE_KEY);
+    if(!raw) return false;
+    const data = JSON.parse(raw);
+    Object.assign(state, data.state);
+    companies = data.companies || [];
+    if(data.landPlots) landPlots = data.landPlots;
+    if(data.camPos) camera.position.set(data.camPos.x, data.camPos.y, data.camPos.z);
+    state.yaw = data.yaw||0; state.pitch = data.pitch||0;
+    renderInventory();
+    return true;
+  }catch(e){ console.error(e); return false; }
+}
+let autoSaveTimer=null;
+function startAutoSave(){
+  if(autoSaveTimer) clearInterval(autoSaveTimer);
+  autoSaveTimer = setInterval(autoSaveSilent, 60000); // 60秒ごとにオートセーブ
+}
+// タスクキル/バックグラウンド移行時にも即保存(visibilitychange/pagehide/beforeunload)
+document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='hidden') autoSaveSilent(); });
+window.addEventListener('pagehide', autoSaveSilent);
+window.addEventListener('beforeunload', autoSaveSilent);
+// 「続きから」ボタンの有効/無効表示
+if(localStorage.getItem(SAVE_KEY)){
+  document.getElementById('continueBtn').style.opacity='1';
+} else {
+  document.getElementById('continueBtn').style.opacity='0.5';
+}
 
 /* ---------------------------------------------------------------------------------
    25. メインループ
@@ -2311,24 +2482,25 @@ function animate(){
   updateParticles(dt);
   updateRaycast();
   checkDropProximity();
-  updateTime(dt*60); // ゲーム内時間は実時間より少し速め(調整可能)
+  updateTime(dt*60);
   rebuildLocalGrid(camera.position.x, camera.position.z);
   updateMiniMap();
   updateHomeMarkers(now);
   updateWorldDrops(now);
   updateCompanyLabels(dt);
 
-  // 噴水演出: 軽い上下浮動
   fountainWater.position.y = 0.85 + Math.sin(now/400)*0.02;
 
   renderer.render(scene, camera);
 }
 animate();
+handleResize();
 
-// 初期ヒント
 window.addEventListener('load', ()=>{
-  setTimeout(()=>toast('ヒント: 画面をドラッグして視点操作、木に近づいて「振る」で伐採できます'), 1500);
+  setTimeout(()=>toast('ヒント: 画面をドラッグして視点操作、木に近づいて「振る」で伐採できます。しゃがみ中は設置モードになります。'), 1500);
 });
+
 </script>
+</div>
 </body>
 </html>
